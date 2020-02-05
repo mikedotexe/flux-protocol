@@ -10,7 +10,7 @@ type Order = orderbook::Order;
 
 #[near_bindgen]
 #[derive(Default, Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
-pub struct BinaryMarket {
+pub struct Market {
 	pub id: u64,
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub creator: String,
@@ -24,7 +24,7 @@ pub struct BinaryMarket {
 	pub liquidity: u64
 }
 
-impl BinaryMarket {
+impl Market {
 	pub fn new(id: u64, from: String, outcomes: u64, description: String, end_time: u64) -> Self {
 		Self {
 			id,

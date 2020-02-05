@@ -4,15 +4,15 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
-mod binary_market;
-type BinaryMarket = binary_market::BinaryMarket;
-type Order = binary_market::orderbook::order::Order;
+mod market;
+type Market = market::Market;
+type Order = market::orderbook::order::Order;
 
 #[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 struct Markets {
 	creator: String,
-	active_markets: BTreeMap<u64, BinaryMarket>,
+	active_markets: BTreeMap<u64, Market>,
 	nonce: u64,
 	fdai_balances: HashMap<String, u64>, // Denominated in 1e18
 	fdai_circulation: u128,
@@ -65,7 +65,7 @@ impl Markets {
 		// TODO: Do some market validation
 		let from = env::predecessor_account_id();
 		// if from == self.creator {
-			let new_market = BinaryMarket::new(self.nonce, from, outcomes, description.to_string(), end_time);
+			let new_market = Market::new(self.nonce, from, outcomes, description.to_string(), end_time);
 			self.active_markets.insert(self.nonce, new_market);
 			self.nonce = self.nonce + 1;
 			return true;
@@ -162,11 +162,11 @@ impl Markets {
 		return &self.creator;
 	}
 
-	pub fn get_all_markets(&self) -> &BTreeMap<u64, BinaryMarket> { 
+	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> { 
 		return &self.active_markets;
 	}
 
-	pub fn get_market(&self, id: u64) -> &BinaryMarket {
+	pub fn get_market(&self, id: u64) -> &Market {
 		let market = self.active_markets.get(&id);
 		return market.unwrap();
 	}
