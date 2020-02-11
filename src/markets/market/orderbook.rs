@@ -131,34 +131,45 @@ impl Orderbook {
 
 	}
 
-	pub fn fill_matching_orders(&mut self, order_to_fill: Option<u64>, to_spend: u64, max_price: u64) -> (u64, u64) {
-		let mut order_id = order_to_fill;
-		let shares_filled = 0;
-		let spend = 0;
-
-
-		while to_spend < spend && !order_id.is_none() {
-			let order = self.open_orders.get(&order_id.unwrap()).unwrap();
-			
-			if order.price_per_share <= max_price {
-				// Fill order accordingly
-				// Calculate order so that the match is filled at the new order's price. the market maker in this case should be rewarded for providing liquidity.
-			}
-			else {
-				// Check what and if order_id should be filled next 
-
-				// Check if order has parent
-					// Check if parent is lower priced than max_price
-						// Add wose_order to back of qeue for later
-			}
-
-		}
+	// To recursive?
+	pub fn fill_matching_orders(&mut self, order_to_fill: u64, amt_of_shares_to_fill: u64, max_price: u64) -> u64 {
+		let mut total_shares_filled = 0;
+		let mut order_deletion_queue: Vec<u64> = vec![];
 		
-		return(spend, shares_filled);
+		while total_shares_filled < amt_of_shares_to_fill && !self.market_order.is_none() {
+			let current_order = self.open_orders.get_mut(&self.market_order.unwrap()).unwrap();
+			
+			if  current_order.price_per_share <= max_price {
+				let mut to_fill = 0;
+				let match_to_fill = current_order.amt_of_shares - current_order.amt_of_shares_filled;
+
+				if match_to_fill > amt_of_shares_to_fill {
+					to_fill = amt_of_shares_to_fill;
+				} else {
+					to_fill = match_to_fill;
+					current_order.filled += to_fill * max_price;
+					current_order.amt_of_shares_filled += to_fill;
+					order_deletion_queue.push(current_order.id);
+					// self.filled_orders.insert(current_order.id, Some(current_order))
+				}
+
+				total_shares_filled += to_fill;
+			}
+		}
+
+		self.delete_orders(order_deletion_queue);
+		
+		print!("get here daddy {} {}", total_shares_filled, total_shares_filled * max_price);
+		return(total_shares_filled);
 	}
 
-	pub fn fill_order(&mut self, order_id: u64, fill_amt: u64, shares_filled: u64) {
-		let order = self.open_orders.get_mut(&order_id).unwrap();
+	fn delete_orders(&mut self, orders: Vec<u64>) {
+		for order_id in orders {
+			self.remove_order(order_id)
+		}
+	}
+
+	pub fn fill_order(&mut self, order: &mut Order, fill_amt: u64, shares_filled: u64) {
 		order.amt_of_shares_filled = order.amt_of_shares_filled + shares_filled;
 		order.filled = order.filled + fill_amt;
 	}

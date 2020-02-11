@@ -55,24 +55,24 @@ impl Market {
 
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		
-		let (amount_filled, amount_of_shares_filled) = self.fill_matches(orderbook_ids, spend, price_per_share);
+		let shares_filled = self.fill_matches(orderbook_ids, amt_of_shares, price_per_share);
+		let total_spend = shares_filled * price_per_share;
 
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
-		orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, amount_filled ,amount_of_shares_filled);
+		orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend , shares_filled);
 	}
 
-	fn fill_matches(&mut self, orderbook_ids: Vec<u64>, to_spend: u64, price_per_share: u64) -> (u64, u64) {
-		let total_filled = 0;
-		let total_shares_filled = 0;
+	fn fill_matches(&mut self, orderbook_ids: Vec<u64>, amt_of_shares: u64, price_per_share: u64) -> u64 {
+		let mut total_shares_filled = 0;
 		let target_price = 100 - price_per_share;
 
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
 			if !orderbook.market_order.is_none() {
-				let (left_to_fill, shares_filled) = orderbook.fill_matching_orders(orderbook.market_order, to_spend, target_price);
+				total_shares_filled += orderbook.fill_matching_orders(orderbook.market_order.unwrap(), amt_of_shares, target_price);
 			}
 		}
-		return (total_filled, total_shares_filled);
+		return total_shares_filled;
 	}
 
 	fn get_inverse_orderbook_ids(&self, principle_outcome: u64) -> Vec<u64> {
