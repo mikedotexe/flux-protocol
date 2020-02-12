@@ -54,8 +54,9 @@ impl Market {
 		let mut total_shares_filled = 0;
 
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
-		
-		let shares_filled = self.fill_matches(orderbook_ids, amt_of_shares, price_per_share);
+		let shares_left = self.fill_matches(orderbook_ids, amt_of_shares, price_per_share);
+
+		let shares_filled = amt_of_shares - shares_left;
 		let total_spend = shares_filled * price_per_share;
 
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
@@ -63,16 +64,18 @@ impl Market {
 	}
 
 	fn fill_matches(&mut self, orderbook_ids: Vec<u64>, amt_of_shares: u64, price_per_share: u64) -> u64 {
-		let mut total_shares_filled = 0;
+		let mut left_to_fill = amt_of_shares;
+
 		let target_price = 100 - price_per_share;
 
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
 			if !orderbook.market_order.is_none() {
-				total_shares_filled += orderbook.fill_matching_orders(orderbook.market_order.unwrap(), amt_of_shares, target_price);
+				left_to_fill = orderbook.fill_matching_orders(left_to_fill, target_price);
 			}
 		}
-		return total_shares_filled;
+
+		return left_to_fill;
 	}
 
 	fn get_inverse_orderbook_ids(&self, principle_outcome: u64) -> Vec<u64> {
@@ -135,23 +138,6 @@ impl Market {
 	// 	}
 
 	// 	return claimable_amount;
-	// }
-
-
-	// pub fn get_open_orders_for_user(&self, from: String, outcome: u64) -> Vec<Order>{
-	// 	let new_orderbook = orderbook::Orderbook::new(outcome);
-	// 	let orderbook = self.orderbooks.get(&outcome).unwrap_or(&new_orderbook);
-	// 	let open_orders = orderbook.get_open_orders_for_user(from);
-
-	// 	return open_orders;
-	// }
-
-	// pub fn get_filled_orders_for_user(&self, from: String, outcome: u64) -> Vec<Order>{
-	// 	let new_orderbook = orderbook::Orderbook::new(outcome);
-	// 	let orderbook = self.orderbooks.get(&outcome).unwrap_or(&new_orderbook);
-	// 	let filled_orders = orderbook.get_filled_orders_for_user(from);
-
-	// 	return filled_orders;
 	// }
 
 	// fn cancel_order(&mut self, outcome: u64, order_id: &u64 ) -> bool{

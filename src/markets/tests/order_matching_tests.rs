@@ -11,15 +11,54 @@ fn test_binary_order_match() {
 	// simplest binary fill scenario
 	// contract.place_order(0, 0, 5000, 50);
 	// contract.place_order(0, 1, 5000, 50);
-	
-	// // no 50/50 odds test
-	contract.place_order(0, 0, 6000, 60);
-	contract.place_order(0, 1, 4000, 40);
 
-	contract.get_
-	// contract.place_order(0, 0, 6000, 60); // 0: filled: 0
-	// contract.place_order(0, 1, 3000, 30); // 1: filled: 0
-	// contract.place_order(0, 1, 5000, 50); // 0: filled: 5000/6000 & 1 share | 1: filled: 0 & 0 shares | 2: filled: 5000/5000 & 1 share
+	// let mut open_no_orders = contract.get_open_orders(0, 0, carol());
+	// let mut open_yes_orders = contract.get_open_orders(0, 1, carol());
+	// assert_eq!(open_no_orders.len(), 0);
+	// assert_eq!(open_yes_orders.len(), 0);
+	// let mut filled_no_orders = contract.get_filled_orders(0, 0, carol());
+	// let mut filled_yes_orders = contract.get_filled_orders(0, 1, carol());
+	// assert_eq!(filled_no_orders.len(), 1);
+	// assert_eq!(filled_yes_orders.len(), 1);
+
+	// simple binary fill scenario over multiple orders
+	// contract.place_order(0, 1, 5000, 50);
+	// contract.place_order(0, 1, 2750, 50);
+	// contract.place_order(0, 0, 7777, 50);
+
+	// let mut open_no_orders = contract.get_open_orders(0, 0, carol());
+	// let mut open_yes_orders = contract.get_open_orders(0, 1, carol());
+	// println!("open: {:?}", open_no_orders);
+	// println!("open: {:?}", open_yes_orders);
+	// assert_eq!(open_no_orders.len(), 0);
+	// assert_eq!(open_yes_orders.len(), 0);
+	// let mut filled_no_orders = contract.get_filled_orders(0, 0, carol());
+	// let mut filled_yes_orders = contract.get_filled_orders(0, 1, carol());
+	// println!("filled: {:?}", filled_no_orders);
+	// println!("filled: {:?}", filled_yes_orders);
+
+	// assert_eq!(filled_no_orders.len(), 1);
+	// assert_eq!(filled_yes_orders.len(), 2);
+
+	// Always fill the best price at the new limit orders' rate 
+	// TODO: Discuss weither this makes sense 
+
+	contract.place_order(0, 0, 8000, 80); // not filled completely
+	contract.place_order(0, 1, 3000, 30); // filled @ 20
+	contract.place_order(0, 1, 1000, 20); // filled @ 20
+
+	let mut open_no_orders = contract.get_open_orders(0, 0, carol());
+	let mut open_yes_orders = contract.get_open_orders(0, 1, carol());
+	println!("open: {:?}", open_no_orders);
+	println!("open: {:?}", open_yes_orders);
+	let mut filled_no_orders = contract.get_filled_orders(0, 0, carol());
+	let mut filled_yes_orders = contract.get_filled_orders(0, 1, carol());
+	println!("filled: {:?}", filled_no_orders);
+	println!("filled: {:?}", filled_yes_orders);
+
+	// assert_eq!(open_no_orders.len(), 1);
+	// assert_eq!(open_yes_orders.len(), 0);
+
 
 
 }

@@ -149,15 +149,17 @@ impl Markets {
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
 	}
 
-	// pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> Vec<Order> {
-	// 	let market = self.active_markets.get(&market_id).unwrap();
-	// 	return market.get_open_orders_for_user(from, outcome);
-	// }
+	pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u64, Order> {
+		let market = self.active_markets.get(&market_id).unwrap();
+		let orderbook = market.orderbooks.get(&outcome).unwrap();
+		return &orderbook.open_orders;
+	}
 	
-	// pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> Vec<Order> {
-	// 	let market = self.active_markets.get(&market_id).unwrap();
-	// 	return market.get_filled_orders_for_user(from, outcome);
-	// }
+	pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u64, Order> {
+		let market = self.active_markets.get(&market_id).unwrap();
+		let orderbook = market.orderbooks.get(&outcome).unwrap();
+		return &orderbook.filled_orders;
+	}
 
 	// pub fn get_earnings(&self, market_id: u64, from: String) -> u64 {
 	// 	return self.active_markets.get(&market_id).unwrap().get_earnings(from, false);	

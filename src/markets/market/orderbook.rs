@@ -88,11 +88,17 @@ impl Orderbook {
 	}
 
 	pub fn remove_order(&mut self, order_id: u64) {
+
+		// if the order has been filled a littlebit push it to filled_orders
 		let order = self.open_orders.get_mut(&order_id).unwrap();
 		let parent = order.parent;
 		let better_order_id = order.better_order_id;
 		let worse_order_id = order.worse_order_id;
 		
+		if order.amt_of_shares_filled > 0 {
+			self.filled_orders.insert(order.id, order.to_owned());
+		}
+
 		if (Some(order_id) == self.market_order) {
 			self.remove_market_order();
 		}
@@ -116,8 +122,8 @@ impl Orderbook {
 				parent.worse_order_id = worse_order_id;
 				self.update_and_replace_order(better_order_id);
 			}
-
 		}
+
 		self.open_orders.remove(&order_id);
 	}
 
@@ -131,36 +137,29 @@ impl Orderbook {
 
 	}
 
-	// To recursive?
-	pub fn fill_matching_orders(&mut self, order_to_fill: u64, amt_of_shares_to_fill: u64, max_price: u64) -> u64 {
-		let mut total_shares_filled = 0;
-		let mut order_deletion_queue: Vec<u64> = vec![];
+	pub fn fill_matching_orders(&mut self, mut amt_of_shares_to_fill: u64, max_price: u64) -> u64 {
+		if amt_of_shares_to_fill == 0 { return 0 ;} 
+		else if self.market_order.is_none() {  return amt_of_shares_to_fill; }
 		
-		while total_shares_filled < amt_of_shares_to_fill && !self.market_order.is_none() {
-			let current_order = self.open_orders.get_mut(&self.market_order.unwrap()).unwrap();
-			
-			if  current_order.price_per_share <= max_price {
-				let mut to_fill = 0;
-				let match_to_fill = current_order.amt_of_shares - current_order.amt_of_shares_filled;
+		let current_order = self.open_orders.get_mut(&self.market_order.unwrap()).unwrap();
+		if current_order.price_per_share < max_price { return amt_of_shares_to_fill }
 
-				if match_to_fill > amt_of_shares_to_fill {
-					to_fill = amt_of_shares_to_fill;
-				} else {
-					to_fill = match_to_fill;
-					current_order.filled += to_fill * max_price;
-					current_order.amt_of_shares_filled += to_fill;
-					order_deletion_queue.push(current_order.id);
-					// self.filled_orders.insert(current_order.id, Some(current_order))
-				}
+		let match_to_fill = (current_order.spend - current_order.filled) / max_price; // Some "dust" creation here - need a way to round orders better.
 
-				total_shares_filled += to_fill;
+		if match_to_fill <= amt_of_shares_to_fill {
+			current_order.filled += match_to_fill * max_price;
+			current_order.amt_of_shares_filled += match_to_fill;
+			amt_of_shares_to_fill -= match_to_fill;
+			if current_order.filled == current_order.spend || match_to_fill == 0{
+				self.remove_order(self.market_order.unwrap()); 
 			}
+		} else {
+			current_order.filled += amt_of_shares_to_fill * max_price;
+			current_order.amt_of_shares_filled += amt_of_shares_to_fill;
+			amt_of_shares_to_fill -= amt_of_shares_to_fill;
 		}
-
-		self.delete_orders(order_deletion_queue);
 		
-		print!("get here daddy {} {}", total_shares_filled, total_shares_filled * max_price);
-		return(total_shares_filled);
+		return self.fill_matching_orders(amt_of_shares_to_fill, max_price);
 	}
 
 	fn delete_orders(&mut self, orders: Vec<u64>) {
