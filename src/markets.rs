@@ -98,13 +98,13 @@ impl Markets {
 		self.subtract_balance(rounded_spend);
 	}
 
-	pub fn cancel_order(&mut self, market_id: u64, outcome: u64, order_id: u64) {
-		let from = env::predecessor_account_id();
-		let orderbook = self.active_markets.get_mut(&market_id).unwrap().orderbooks.get_mut(&outcome).unwrap();
-		let order = orderbook.open_orders.get(&order_id).unwrap();
-		assert_eq!(order.creator, from);
-		orderbook.remove_order(order_id);
-	}
+	// pub fn cancel_order(&mut self, market_id: u64, outcome: u64, order_id: u64) {
+	// 	let from = env::predecessor_account_id();
+	// 	let orderbook = self.active_markets.get_mut(&market_id).unwrap().orderbooks.get_mut(&outcome).unwrap();
+	// 	let order = orderbook.open_orders.get(&order_id).unwrap();
+	// 	assert_eq!(order.creator, from);
+	// 	orderbook.remove_order(order_id);
+	// }
 
 	pub fn resolute(&mut self, market_id: u64, payout: Vec<u64>, invalid: bool) -> bool {
 		let from = env::predecessor_account_id();
@@ -149,17 +149,17 @@ impl Markets {
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
 	}
 
-	pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u64, Order> {
-		let market = self.active_markets.get(&market_id).unwrap();
-		let orderbook = market.orderbooks.get(&outcome).unwrap();
-		return &orderbook.open_orders;
-	}
+	// pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u64, Order> {
+	// 	let market = self.active_markets.get(&market_id).unwrap();
+	// 	let orderbook = market.orderbooks.get(&outcome).unwrap();
+	// 	return &orderbook.open_orders;
+	// }
 	
-	pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u64, Order> {
-		let market = self.active_markets.get(&market_id).unwrap();
-		let orderbook = market.orderbooks.get(&outcome).unwrap();
-		return &orderbook.filled_orders;
-	}
+	// pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u64, Order> {
+	// 	let market = self.active_markets.get(&market_id).unwrap();
+	// 	let orderbook = market.orderbooks.get(&outcome).unwrap();
+	// 	return &orderbook.filled_orders;
+	// }
 
 	// pub fn get_earnings(&self, market_id: u64, from: String) -> u64 {
 	// 	return self.active_markets.get(&market_id).unwrap().get_earnings(from, false);	
@@ -246,7 +246,8 @@ mod tests {
 	// mod init_tests;
 	// mod bst_tests;
 	// mod market_order_tests;
-	mod order_matching_tests;
+	// mod order_matching_tests;
+	mod categorical_market_tests;
 
 	// #[test]
 	// fn test_categorical_market_orders() {

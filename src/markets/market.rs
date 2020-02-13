@@ -16,6 +16,8 @@ pub struct Market {
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub creator: String,
 	pub outcomes: u64,
+	pub open_orders: BTreeMap<u64, Order>,
+	pub filled_orders: BTreeMap<u64, Order>,
 	pub description: String,
 	pub end_time: u64,
 	pub oracle_address: String,
@@ -38,6 +40,8 @@ impl Market {
 			orderbooks: empty_orderbooks,
 			creator: from,
 			outcomes,
+			open_orders: BTreeMap::new(),
+			filled_orders: BTreeMap::new(),
 			description,
 			end_time, 
 			oracle_address: env::current_account_id(),
@@ -54,28 +58,23 @@ impl Market {
 		let mut total_shares_filled = 0;
 
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
-		let shares_left = self.fill_matches(orderbook_ids, amt_of_shares, price_per_share);
+		let shares_left = self.check_for_fills(orderbook_ids, amt_of_shares, price_per_share);
 
-		let shares_filled = amt_of_shares - shares_left;
-		let total_spend = shares_filled * price_per_share;
+		// let shares_filled = amt_of_shares - shares_left;
+		// let total_spend = shares_filled * price_per_share;
 
-		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
-		orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend , shares_filled);
+		// let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
+		// orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend , shares_filled);
 	}
 
-	fn fill_matches(&mut self, orderbook_ids: Vec<u64>, amt_of_shares: u64, price_per_share: u64) -> u64 {
-		let mut left_to_fill = amt_of_shares;
-
-		let target_price = 100 - price_per_share;
-
+	fn check_for_fills(&mut self, orderbook_ids: Vec<u64>, amt_of_shares: u64, price_per_share: u64) -> u64 {
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
 			if !orderbook.market_order.is_none() {
-				left_to_fill = orderbook.fill_matching_orders(left_to_fill, target_price);
 			}
 		}
 
-		return left_to_fill;
+		return 0;
 	}
 
 	fn get_inverse_orderbook_ids(&self, principle_outcome: u64) -> Vec<u64> {

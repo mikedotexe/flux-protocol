@@ -45,20 +45,17 @@ fn test_binary_order_match() {
 
 	contract.place_order(0, 0, 8000, 80); // not filled completely
 	contract.place_order(0, 1, 3000, 30); // filled @ 20
-	contract.place_order(0, 1, 1000, 20); // filled @ 20
+	contract.place_order(0, 1, 240, 20); // filled @ 20
+	contract.place_order(0, 1, 240, 20); // filled @ 20
 
 	let mut open_no_orders = contract.get_open_orders(0, 0, carol());
 	let mut open_yes_orders = contract.get_open_orders(0, 1, carol());
-	println!("open: {:?}", open_no_orders);
-	println!("open: {:?}", open_yes_orders);
 	let mut filled_no_orders = contract.get_filled_orders(0, 0, carol());
 	let mut filled_yes_orders = contract.get_filled_orders(0, 1, carol());
-	println!("filled: {:?}", filled_no_orders);
-	println!("filled: {:?}", filled_yes_orders);
 
-	// assert_eq!(open_no_orders.len(), 1);
-	// assert_eq!(open_yes_orders.len(), 0);
-
-
+	assert_eq!(open_no_orders.len(), 0);
+	assert_eq!(open_yes_orders.len(), 1);
+	assert_eq!(filled_no_orders.len(), 1);
+	assert_eq!(filled_yes_orders.len(), 2);
 
 }
