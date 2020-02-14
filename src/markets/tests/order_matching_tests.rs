@@ -53,6 +53,11 @@ fn test_binary_order_match() {
 	let mut filled_no_orders = contract.get_filled_orders(0, 0, carol());
 	let mut filled_yes_orders = contract.get_filled_orders(0, 1, carol());
 
+	println!("open no orders: {:?}", open_no_orders);
+	println!("open yes orders: {:?}", open_yes_orders);
+	println!("filled no orders: {:?}", filled_no_orders);
+	println!("filled yes orders: {:?}", filled_yes_orders);
+	
 	assert_eq!(open_no_orders.len(), 0);
 	assert_eq!(open_yes_orders.len(), 1);
 	assert_eq!(filled_no_orders.len(), 1);

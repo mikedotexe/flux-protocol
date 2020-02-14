@@ -58,23 +58,51 @@ impl Market {
 		let mut total_shares_filled = 0;
 
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
-		let shares_left = self.check_for_fills(orderbook_ids, amt_of_shares, price_per_share);
+		let shares_left = self.fill_matches(orderbook_ids, amt_of_shares, price_per_share);
 
-		// let shares_filled = amt_of_shares - shares_left;
-		// let total_spend = shares_filled * price_per_share;
+		let shares_filled = amt_of_shares - shares_left;
+		let total_spend = shares_filled * price_per_share;
 
-		// let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
-		// orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend , shares_filled);
+		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
+		orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend , shares_filled);
 	}
 
-	fn check_for_fills(&mut self, orderbook_ids: Vec<u64>, amt_of_shares: u64, price_per_share: u64) -> u64 {
+	fn fill_matches(&mut self, orderbook_ids: Vec<u64>, amt_of_shares: u64, price_per_share: u64) -> u64 {
+		let mut left_to_fill = amt_of_shares;
+		let max_price = 100 - price_per_share;
+		
+		// make this a hashmap?
+		let mut market_prices: Vec<u64> = vec![];
+
+		
+		// Loop through orderbooks
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
-			if !orderbook.market_order.is_none() {
+			let market_order_optional = orderbook.market_order;
+
+			if !market_order_optional.is_none() {
+				let market_order = orderbook.open_orders.get(&market_order_optional.unwrap()).unwrap();
+				market_prices.push(market_order.price_per_share);
+			} else {
+				market_prices.push(100);
 			}
 		}
 
-		return 0;
+		market_prices.sort();
+		println!("market prices: {:?}", market_prices);
+		
+		// TODO: Figure out the best data structures for this logic
+		let mut orderbooks_to_use: Vec<u64> = vec![];
+		let mut market_price = 100;
+		// loop through market prices, the index of the loop does not reference the orderbook of that specific orderbook
+			// check if market_price < max_price 
+				// if yes: marketPrice -= this_matching_market_price
+				// if no: stop the loop and use the market price if there is one set
+
+
+
+
+		return left_to_fill;
 	}
 
 	fn get_inverse_orderbook_ids(&self, principle_outcome: u64) -> Vec<u64> {
@@ -96,6 +124,7 @@ impl Market {
 
 
 
+
 	pub fn resolute(&mut self, payout: Vec<u64>, invalid: bool) {
 		// TODO: Make sure market can only be resoluted after end time
 		assert_eq!(self.resoluted, false);
@@ -107,7 +136,7 @@ impl Market {
 		self.resoluted = true;
 	}
 	
-	// // Try and remove dups
+	// Try and remove dups
 	// pub fn claim_earnings(&mut self, from: String) -> u64 {
 	// 	assert!(!self.payout_multipliers.is_none() && !self.invalid.is_none());		
 	// 	assert_eq!(self.resoluted, true);
