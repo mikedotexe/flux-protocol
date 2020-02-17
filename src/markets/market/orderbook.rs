@@ -40,7 +40,7 @@ impl Orderbook {
 		let order_id = self.new_order_id();
 		let mut new_order = Order::new(from, outcome, order_id, spend, amt_of_shares, price_per_share, filled, amt_of_shares_filled);
 
-		if filled == spend {
+		if amt_of_shares >= amt_of_shares_filled {
 			self.filled_orders.insert(order_id, new_order);
 			return;
 		}
@@ -133,30 +133,39 @@ impl Orderbook {
 
 	}
 
-	pub fn fill_matching_orders(&mut self, mut amt_of_shares_to_fill: u64, max_price: u64) -> u64 {
-		if amt_of_shares_to_fill == 0 { return 0 ;} 
-		else if self.market_order.is_none() {  return amt_of_shares_to_fill; }
-		
+	pub fn fill_market_order(&mut self, mut amt_of_shares_to_fill: u64) {
 		let current_order = self.open_orders.get_mut(&self.market_order.unwrap()).unwrap();
-		if current_order.price_per_share < max_price { return amt_of_shares_to_fill }
 
-		let match_to_fill = (current_order.spend - current_order.filled) / max_price; // Some "dust" creation here - need a way to round orders better.
-
-		if match_to_fill <= amt_of_shares_to_fill {
-			current_order.filled += match_to_fill * max_price;
-			current_order.amt_of_shares_filled += match_to_fill;
-			amt_of_shares_to_fill -= match_to_fill;
-			if current_order.filled == current_order.spend || match_to_fill == 0{
-				self.remove_order(self.market_order.unwrap()); 
-			}
-		} else {
-			current_order.filled += amt_of_shares_to_fill * max_price;
-			current_order.amt_of_shares_filled += amt_of_shares_to_fill;
-			amt_of_shares_to_fill -= amt_of_shares_to_fill;
+		current_order.amt_of_shares_filled += amt_of_shares_to_fill;
+		if current_order.amt_of_shares_filled == current_order.amt_of_shares {
+			self.remove_order(self.market_order.unwrap()); 
 		}
-		
-		return self.fill_matching_orders(amt_of_shares_to_fill, max_price);
 	}
+
+	// pub fn fill_matching_orders(&mut self, mut amt_of_shares_to_fill: u64, max_price: u64) -> u64 {
+	// 	if amt_of_shares_to_fill == 0 { return 0 ;} 
+	// 	else if self.market_order.is_none() {  return amt_of_shares_to_fill; }
+		
+	// 	let current_order = self.open_orders.get_mut(&self.market_order.unwrap()).unwrap();
+	// 	if current_order.price_per_share < max_price { return amt_of_shares_to_fill }
+
+	// 	let match_to_fill = (current_order.spend - current_order.filled) / max_price; // Some "dust" creation here - need a way to round orders better.
+
+	// 	if match_to_fill <= amt_of_shares_to_fill {
+	// 		current_order.filled += match_to_fill * max_price;
+	// 		current_order.amt_of_shares_filled += match_to_fill;
+	// 		amt_of_shares_to_fill -= match_to_fill;
+	// 		if current_order.filled == current_order.spend || match_to_fill == 0{
+	// 			self.remove_order(self.market_order.unwrap()); 
+	// 		}
+	// 	} else {
+	// 		current_order.filled += amt_of_shares_to_fill * max_price;
+	// 		current_order.amt_of_shares_filled += amt_of_shares_to_fill;
+	// 		amt_of_shares_to_fill -= amt_of_shares_to_fill;
+	// 	}
+		
+	// 	return self.fill_matching_orders(amt_of_shares_to_fill, max_price);
+	// }
 
 	fn delete_orders(&mut self, orders: Vec<u64>) {
 		for order_id in orders {

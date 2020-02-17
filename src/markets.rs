@@ -179,10 +179,14 @@ impl Markets {
 	}
 
 	pub fn get_market_order(&self, market_id: u64, outcome: u64)  -> Option<u64> {
-		let market = self.active_markets.get(&market_id);
-		return market.unwrap().orderbooks[&outcome].market_order;
+		let market = self.active_markets.get(&market_id).unwrap();
+		return market.orderbooks[&outcome].market_order;
 	}
 
+	pub fn get_market_price(&self, market_id: u64, outcome: u64) -> u64 {
+		let market = self.active_markets.get(&market_id).unwrap();
+		return market.get_market_price(outcome);
+	}
 	pub fn get_fdai_metrics(&self) -> (u128, u128, u128, u64) {
 		return (self.fdai_circulation, self.fdai_in_protocol, self.fdai_outside_escrow, self.user_count);
 	}
