@@ -55,46 +55,42 @@ impl Market {
 	// Order filling and keeping track of spendages is way to complicated for now.
 	pub fn place_order(&mut self, from: String, outcome: u64, amt_of_shares: u64, spend: u64, price_per_share: u64) {
 		assert_eq!(self.resoluted, false);
-		let mut total_shares_filled = 0;
-
-
-		// Do this in fill matches and fire that recursively till all market orders are filled or spend is spend.
-		let market_price = self.get_market_price(outcome);
-
-		let mut shares_filled = 0;
-
-		if price_per_share >= market_price {
-			shares_filled += self.fill_matches(outcome, market_price, spend);
-		}
-
-		let total_spend = shares_filled * price_per_share;
+		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price_per_share, amt_of_shares);
+		
+		let total_spend = spend - spend_filled;
+		let shares_filled = amt_of_shares - shares_filled;
 
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend, shares_filled);
 	}
 
 	// Recursion here instead of in the orderbook
-	fn fill_matches(&mut self, outcome: u64, market_price: u64, spend: u64) -> u64 {
+	fn fill_matches(&mut self, outcome: u64, mut spend: u64, price_per_share: u64, mut shares_filled: u64) -> (u64, u64) {
+		let market_price = self.get_market_price(outcome);
+		if price_per_share < market_price || spend == 0 { return (spend, shares_filled); }
+		
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
-		let mut amt_of_shares = spend / market_price;
 		let shares_fillable = self.get_min_shares_fillable(outcome);
-		let mut shares_filled = 0;
-
-		if shares_fillable < amt_of_shares {
-			amt_of_shares = shares_fillable;
+		
+		let mut shares_to_fill = shares_filled;
+		
+		if shares_fillable < shares_filled {
+			shares_to_fill = shares_fillable;
 		}
-
+				
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
-			orderbook.fill_market_order(amt_of_shares);
-			shares_filled += amt_of_shares;
+			orderbook.fill_market_order(shares_to_fill);
+			
+			spend -= shares_to_fill * market_price;
+			shares_filled -= shares_to_fill;
 		}
-
-		return shares_filled;
+		
+		return self.fill_matches(outcome, spend, price_per_share, shares_filled);
 	}
 
 	pub fn get_min_shares_fillable(&self, outcome: u64) -> u64 {
-		let mut shares = 100;
+		let mut shares = None;
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 
 		for orderbook_id in orderbook_ids {
@@ -103,15 +99,16 @@ impl Market {
 
 			if !market_order_optional.is_none() {
 				let market_order = orderbook.open_orders.get(&market_order_optional.unwrap()).unwrap();
-				let shares_to_fill = market_order.amt_of_shares - market_order.amt_of_shares_filled;
+				let left_to_fill = market_order.spend - market_order.filled;
+				let shares_to_fill = left_to_fill  / market_order.price_per_share;
 
-				if shares < shares {
-					shares = shares;
+				if shares.is_none() || shares_to_fill < shares.unwrap() {
+					shares = Some(shares_to_fill);
 				}
 			} 
 		}
 
-		return shares;
+		return shares.unwrap();
 	}
 
 	pub fn get_market_price(&self, outcome: u64) -> u64 {

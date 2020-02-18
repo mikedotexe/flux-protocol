@@ -10,9 +10,6 @@ fn test_categorical_market_matches() {
 	contract.place_order(0, 0, 100, 50);
 	contract.place_order(0, 1, 100, 50); 
 
-	
-
-
 	// market prices testing: 
 	// contract.place_order(0, 0, 100, 50);
 	// contract.place_order(0, 1, 100, 20); 

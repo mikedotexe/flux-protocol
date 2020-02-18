@@ -247,28 +247,10 @@ mod tests {
 		}
 	}
 
-	// mod init_tests;
-	// mod bst_tests;
-	// mod market_order_tests;
-	// mod order_matching_tests;
-	mod categorical_market_tests;
-
-	// #[test]
-	// fn test_categorical_market_orders() {
-	// 	testing_env!(get_context(carol()));
-		
-	// 	let mut contract = Markets::default();
-	// 	contract.claim_fdai();
-	// 	contract.create_market(3, "Hi!".to_string(), 100010101001010);
-	// 	contract.place_order(0, 0, 100000, 500);
-	// 	contract.place_order(0, 0, 100000, 500);
-	// 	contract.place_order(0, 1, 100000, 500);
-
-	// 	let open_orders = contract.get_market(0).orderbooks.get(&0);
-
-	// 	println!("{:?}", open_orders);
-		
-	// }	
+	mod init_tests;
+	mod bst_tests;
+	mod market_order_tests;
+	mod binary_order_matching_tests;
 
 
 }

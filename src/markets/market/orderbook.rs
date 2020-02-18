@@ -40,7 +40,7 @@ impl Orderbook {
 		let order_id = self.new_order_id();
 		let mut new_order = Order::new(from, outcome, order_id, spend, amt_of_shares, price_per_share, filled, amt_of_shares_filled);
 
-		if amt_of_shares >= amt_of_shares_filled {
+		if filled >= spend {
 			self.filled_orders.insert(order_id, new_order);
 			return;
 		}
@@ -132,12 +132,14 @@ impl Orderbook {
 		}
 
 	}
-
+	
+	// TODO: Should catch these rounding errors earlier, right now some "dust" will be lost.
 	pub fn fill_market_order(&mut self, mut amt_of_shares_to_fill: u64) {
 		let current_order = self.open_orders.get_mut(&self.market_order.unwrap()).unwrap();
 
 		current_order.amt_of_shares_filled += amt_of_shares_to_fill;
-		if current_order.amt_of_shares_filled == current_order.amt_of_shares {
+		current_order.filled += amt_of_shares_to_fill * current_order.price_per_share;
+		if current_order.spend - current_order.filled < 100 { // some rounding erros here might cause some stack overflow bugs that's why this is build in.
 			self.remove_order(self.market_order.unwrap()); 
 		}
 	}

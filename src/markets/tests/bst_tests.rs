@@ -7,13 +7,14 @@ fn test_bst_additions() {
 	let mut contract = Markets::default();
 	contract.claim_fdai();
 	contract.create_market(3, "Hi!".to_string(), 100010101001010);
-	contract.place_order(0, 0, 100000, 500);
-	contract.place_order(0, 0, 100000, 300);
-	contract.place_order(0, 0, 100000, 600);
-	contract.place_order(0, 0, 100000, 700);
-	contract.place_order(0, 0, 100000, 550);
-	contract.place_order(0, 0, 100000, 350);
-	contract.place_order(0, 0, 100000, 500);
+	
+	contract.place_order(0, 0, 100000, 50);
+	contract.place_order(0, 0, 100000, 30);
+	contract.place_order(0, 0, 100000, 60);
+	contract.place_order(0, 0, 100000, 70);
+	contract.place_order(0, 0, 100000, 55);
+	contract.place_order(0, 0, 100000, 35);
+	contract.place_order(0, 0, 100000, 50);
 
 
 	let open_orders = &contract.get_market(0).orderbooks.get(&0).as_ref().unwrap().open_orders;
@@ -78,12 +79,12 @@ fn test_bst_removal() {
 	let mut contract = Markets::default();
 	contract.claim_fdai();
 	contract.create_market(3, "Hi!".to_string(), 100010101001010);
-	contract.place_order(0, 0, 100000, 500);
-	contract.place_order(0, 0, 100000, 300);
-	contract.place_order(0, 0, 100000, 600);
-	contract.place_order(0, 0, 100000, 700);
-	contract.place_order(0, 0, 100000, 550);
-	contract.place_order(0, 0, 100000, 350);
+	contract.place_order(0, 0, 100000, 50);
+	contract.place_order(0, 0, 100000, 30);
+	contract.place_order(0, 0, 100000, 60);
+	contract.place_order(0, 0, 100000, 70);
+	contract.place_order(0, 0, 100000, 55);
+	contract.place_order(0, 0, 100000, 35);
 	contract.cancel_order(0, 0, 0);
 	contract.cancel_order(0, 0, 1);
 
