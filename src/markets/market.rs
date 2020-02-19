@@ -21,8 +21,7 @@ pub struct Market {
 	pub description: String,
 	pub end_time: u64,
 	pub oracle_address: String,
-	pub payout_multipliers: Option<Vec<u64>>,
-	pub invalid: Option<bool>,
+	pub winning_outcome: Option<u64>,
 	pub resoluted: bool,
 	pub liquidity: u64
 }
@@ -45,8 +44,7 @@ impl Market {
 			description,
 			end_time, 
 			oracle_address: env::current_account_id(),
-			payout_multipliers: None,
-			invalid: None,
+			winning_outcome: None,
 			resoluted: false,
 			liquidity: 0
 		}
@@ -68,11 +66,10 @@ impl Market {
 	fn fill_matches(&mut self, outcome: u64, mut spend: u64, price_per_share: u64, mut shares_filled: u64) -> (u64, u64) {
 		let market_price = self.get_market_price(outcome);
 		if price_per_share < market_price || spend == 0 { return (spend, shares_filled); }
-		
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		let shares_fillable = self.get_min_shares_fillable(outcome);
 		
-		let mut shares_to_fill = shares_filled;
+		let mut shares_to_fill = shares_filled / orderbook_ids.len() as u64;
 		
 		if shares_fillable < shares_filled {
 			shares_to_fill = shares_fillable;
@@ -81,7 +78,6 @@ impl Market {
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
 			orderbook.fill_market_order(shares_to_fill);
-			
 			spend -= shares_to_fill * market_price;
 			shares_filled -= shares_to_fill;
 		}
@@ -140,72 +136,30 @@ impl Market {
 		return orderbooks;
 	}
 
-	pub fn resolute(&mut self, payout: Vec<u64>, invalid: bool) {
+	pub fn resolute(&mut self,from: String, winning_outcome: Option<u64>) {
 		// TODO: Make sure market can only be resoluted after end time
 		assert_eq!(self.resoluted, false);
-		assert_eq!(env::predecessor_account_id(), self.creator);
-		assert_eq!(payout.len(), 2);
-		assert!(self.is_valid_payout(&payout, &invalid));
-		self.payout_multipliers = Some(payout);
-		self.invalid = Some(invalid);
+		assert_eq!(from, self.creator);
+		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
+		self.winning_outcome = winning_outcome;
 		self.resoluted = true;
 	}
 	
-	// Try and remove dups
-	// pub fn claim_earnings(&mut self, from: String) -> u64 {
-	// 	assert!(!self.payout_multipliers.is_none() && !self.invalid.is_none());		
-	// 	assert_eq!(self.resoluted, true);
-	// 	let mut claimable_amount = 0;
+	pub fn get_claimable(&self, from: String) -> u64 {
+		assert_eq!(self.resoluted, true);
+		let invalid = self.winning_outcome.is_none();
+		let mut claimable = 0;
 
-	// 	for outcome in 0..self.outcomes {
-	// 		let new_orderbook = &mut orderbook::Orderbook::new(outcome);
-	// 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap_or(new_orderbook);
-	// 		let (open_interest, earnings) = orderbook.get_and_delete_earnings(from.to_string(), self.invalid.unwrap());
-	// 		claimable_amount += self.calc_claimable_amount(outcome, open_interest, earnings);
-	// 	}
-
-	// 	return claimable_amount;
-	// }
-
-	// pub fn get_earnings(&self, from: String, and_claim: bool) -> u64 {
-	// 	assert!(!self.payout_multipliers.is_none() && !self.invalid.is_none());		
-	// 	assert_eq!(self.resoluted, true);
-
-	// 	let mut claimable_amount = 0;
-
-	// 	for outcome in 0..self.outcomes {
-	// 		let new_orderbook = orderbook::Orderbook::new(outcome);
-	// 		let orderbook = self.orderbooks.get(&outcome).unwrap_or(&new_orderbook);
-	// 		let (open_interest, earnings, _open_orders_to_delete, _filled_orders_to_delete) = orderbook.get_earnings(from.to_string(), and_claim, self.invalid.unwrap());
-	// 		claimable_amount += self.calc_claimable_amount(outcome, open_interest, earnings);
-	// 	}
-
-	// 	return claimable_amount;
-	// }
-
-	// fn cancel_order(&mut self, outcome: u64, order_id: &u64 ) -> bool{
-	// 	if let Entry::Occupied(mut orderbook) = self.orderbooks.entry(outcome) {
-	// 		orderbook.get_mut().remove(*order_id);
-	// 		return true;
-	// 	}
-	// 	return false;
-	// }
-
-	fn calc_claimable_amount(&self, outcome: u64, open_interest: u64, potential_earnings: u64) -> u64 {
-		let payout_multiplier = self.payout_multipliers.as_ref().unwrap()[outcome as usize];
-		let mut earnings = 0;
-		if self.invalid.unwrap() {
-			earnings = potential_earnings;
-		} else {
-			if payout_multiplier == 0 {
-				earnings = potential_earnings * payout_multiplier;
-			} 
-			else {
-				earnings = potential_earnings;
+		if invalid {
+			// loop through all orderbooks and add up all spend to claimable
+			for (key, orderbook) in self.orderbooks.iter() {
+				claimable += orderbook.get_spend_by(from.to_string());
 			}
-			earnings = earnings + open_interest;
+		} else {
+			// loop through the winning orderbooks and add al shares bought * 1 dai to claimable amount
 		}
-		return earnings;
+
+		return claimable;
 	}
 
 	fn to_user_outcome_id(&self, user: String, outcome: u64) -> String {
@@ -215,11 +169,5 @@ impl Market {
 	fn is_valid_payout(&self, payout_multipliers: &Vec<u64>, invalid: &bool) -> bool {
 		return (payout_multipliers[0] == 10000 && payout_multipliers[1] == 0 && invalid == &false) || (payout_multipliers[0] == 0 && payout_multipliers[1] == 10000 && invalid == &false) || (payout_multipliers[0] == 5000 && payout_multipliers[1] == 5000 && invalid == &true);
 	}
-
-	// fn get_order(&self, outcome: u64, order_id: &u64 ) -> &orderbook::Order {
-	// 	let orderbook = self.orderbooks.get(&outcome).unwrap();
-	// 	return orderbook.get_order_by_id(order_id);
-	// }
-	
 }
 

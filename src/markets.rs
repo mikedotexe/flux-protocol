@@ -100,32 +100,20 @@ impl Markets {
 
 	pub fn cancel_order(&mut self, market_id: u64, outcome: u64, order_id: u64) {
 		let from = env::predecessor_account_id();
-		let orderbook = self.active_markets.get_mut(&market_id).unwrap().orderbooks.get_mut(&outcome).unwrap();
+		let market = self.active_markets.get_mut(&market_id).unwrap();
+		assert_eq!(market.resoluted, false);
+		let orderbook = market.orderbooks.get_mut(&outcome).unwrap();
 		let order = orderbook.open_orders.get(&order_id).unwrap();
 		assert_eq!(order.creator, from);
-		orderbook.remove_order(order_id);
+		let outstanding_spend = orderbook.remove_order(order_id);
+		self.add_balance(outstanding_spend)
 	}
 
-	pub fn resolute(&mut self, market_id: u64, payout: Vec<u64>, invalid: bool) -> bool {
+	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
 		let from = env::predecessor_account_id();
-		let mut resoluted = false;
-		self.active_markets.entry(market_id).and_modify(|market| {
-			assert_eq!(market.creator, from);
-			market.resolute(payout, invalid);
-		});
-		return resoluted;
+		let market = self.active_markets.get_mut(&market_id).unwrap();
+		market.resolute(from, winning_outcome);
 	}
-
-	// pub fn claim_earnings(&mut self, market_id: u64) {
-	// 	let from = env::predecessor_account_id();
-	// 	let mut earnings = 0;
-	// 	self.active_markets.entry(market_id).and_modify(|market| {
-	// 		earnings = market.claim_earnings(from.to_string());
-	// 	});
-
-	// 	assert!(earnings > 0);
-	// 	self.add_balance(earnings)
-	// }
 
 	fn subtract_balance(&mut self, amount: u64) {
 		let from = env::predecessor_account_id();
@@ -161,12 +149,8 @@ impl Markets {
 		return &orderbook.filled_orders;
 	}
 
-	// pub fn get_earnings(&self, market_id: u64, from: String) -> u64 {
-	// 	return self.active_markets.get(&market_id).unwrap().get_earnings(from, false);	
-	// }
-
-	pub fn get_owner(&self) -> &String {
-		return &self.creator;
+	pub fn get_claimable(&self, market_id: u64, from: String) -> u64 {
+		return self.active_markets.get(&market_id).unwrap().get_claimable(from);	
 	}
 
 	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> { 
@@ -247,10 +231,12 @@ mod tests {
 		}
 	}
 
-	mod init_tests;
-	mod bst_tests;
-	mod market_order_tests;
-	mod binary_order_matching_tests;
+	// mod init_tests;
+	// mod bst_tests;
+	// mod market_order_tests;
+	// mod binary_order_matching_tests;
+	// mod categorical_market_tests;
+	mod test_market_resolution;
 
 
 }

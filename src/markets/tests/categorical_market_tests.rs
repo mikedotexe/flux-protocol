@@ -5,27 +5,25 @@ fn test_categorical_market_matches() {
 	testing_env!(get_context(carol()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market(3, "Hi!".to_string(), 100010101001010);
+	contract.create_market(4, "Hi!".to_string(), 100010101001010);
 
-	contract.place_order(0, 0, 100, 50);
-	contract.place_order(0, 1, 100, 50); 
+	contract.place_order(0, 0, 10000, 70);
+	contract.place_order(0, 0, 10000, 70);
+	contract.place_order(0, 1, 10000, 10); 
+	contract.place_order(0, 2, 10000, 10); 
+	contract.place_order(0, 3, 10000, 10); 
 
-	// market prices testing: 
-	// contract.place_order(0, 0, 100, 50);
-	// contract.place_order(0, 1, 100, 20); 
-	// contract.place_order(0, 2, 100, 20);
+	let mut open_0_orders = contract.get_open_orders(0, 0, carol());
+	let mut open_1_orders = contract.get_open_orders(0, 1, carol());
+	let mut open_2_orders = contract.get_open_orders(0, 2, carol());
+	let mut filled_0_orders = contract.get_filled_orders(0, 0, carol());
+	let mut filled_1_orders = contract.get_filled_orders(0, 1, carol());
+	let mut filled_2_orders = contract.get_filled_orders(0, 2, carol());
 
-	// let mut market_0_price = contract.get_market_price(0, 0);
-	// let mut market_1_price = contract.get_market_price(0, 1);
-	// let mut market_2_price = contract.get_market_price(0, 2);
-	// assert_eq!(market_0_price, 60);
-	// assert_eq!(market_1_price, 30);
-	// assert_eq!(market_2_price, 30);
+	// // uncomment for orderbook state check
+	// println!("{:?}", open_0_orders);
+	// println!("{:?}", open_1_orders);
+	// println!("{:?}", open_2_orders);
 
-	// contract.place_order(0,2, 5000, 29);
-
-	// market_1_price = contract.get_market_price(0, 21);
-	// assert_eq!(market_1_price, 1);
-
-
+	// TODO: write assertions for the orderbook lengths
 }

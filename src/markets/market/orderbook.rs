@@ -14,6 +14,7 @@ pub struct Orderbook {
 	pub market_order: Option<u64>,
 	pub open_orders: BTreeMap<u64, Order>,
 	pub filled_orders: BTreeMap<u64, Order>,
+	pub spend_by_user: BTreeMap<String, u64>,
 	pub nonce: u64,
 	pub outcome_id: u64
 }
@@ -24,6 +25,7 @@ impl Orderbook {
 			root: None,
 			open_orders: BTreeMap::new(),
 			filled_orders: BTreeMap::new(),
+			spend_by_user: BTreeMap::new(),
 			market_order: None,
 			nonce: 0,
 			outcome_id: outcome,
@@ -38,7 +40,8 @@ impl Orderbook {
 
 	pub fn place_order(&mut self, from: String, outcome: u64, spend: u64, amt_of_shares: u64, price_per_share: u64, filled: u64, amt_of_shares_filled: u64) {
 		let order_id = self.new_order_id();
-		let mut new_order = Order::new(from, outcome, order_id, spend, amt_of_shares, price_per_share, filled, amt_of_shares_filled);
+		let mut new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price_per_share, filled, amt_of_shares_filled);
+		*self.spend_by_user.entry(from.to_string()).or_insert(0) += spend;
 
 		if filled >= spend {
 			self.filled_orders.insert(order_id, new_order);
@@ -85,9 +88,11 @@ impl Orderbook {
 		}
 	}
 
-	pub fn remove_order(&mut self, order_id: u64) {
+	pub fn remove_order(&mut self, order_id: u64) -> u64 {
 		// if the order has been filled a littlebit push it to filled_orders
 		let order = self.open_orders.get_mut(&order_id).unwrap();
+		let outstanding_spend = order.spend - order.filled;
+		*self.spend_by_user.get_mut(&order.creator).unwrap() -= outstanding_spend;
 		let parent = order.parent;
 		let better_order_id = order.better_order_id;
 		let worse_order_id = order.worse_order_id;
@@ -110,7 +115,8 @@ impl Orderbook {
 			if !worse_order_id.is_none() {
 				self.update_and_replace_order(worse_order_id);
 			}
-		} else {
+		} 
+		else {
 			let parent = self.open_orders.get_mut(&parent.unwrap()).unwrap();
 			if parent.better_order_id == Some(order_id) {
 				parent.better_order_id = better_order_id;
@@ -121,7 +127,9 @@ impl Orderbook {
 			}
 		}
 
+		
 		self.open_orders.remove(&order_id);
+		return outstanding_spend;
 	}
 
 	fn update_and_replace_order(&mut self, order_id: Option<u64>) {
@@ -144,43 +152,7 @@ impl Orderbook {
 		}
 	}
 
-	// pub fn fill_matching_orders(&mut self, mut amt_of_shares_to_fill: u64, max_price: u64) -> u64 {
-	// 	if amt_of_shares_to_fill == 0 { return 0 ;} 
-	// 	else if self.market_order.is_none() {  return amt_of_shares_to_fill; }
-		
-	// 	let current_order = self.open_orders.get_mut(&self.market_order.unwrap()).unwrap();
-	// 	if current_order.price_per_share < max_price { return amt_of_shares_to_fill }
 
-	// 	let match_to_fill = (current_order.spend - current_order.filled) / max_price; // Some "dust" creation here - need a way to round orders better.
-
-	// 	if match_to_fill <= amt_of_shares_to_fill {
-	// 		current_order.filled += match_to_fill * max_price;
-	// 		current_order.amt_of_shares_filled += match_to_fill;
-	// 		amt_of_shares_to_fill -= match_to_fill;
-	// 		if current_order.filled == current_order.spend || match_to_fill == 0{
-	// 			self.remove_order(self.market_order.unwrap()); 
-	// 		}
-	// 	} else {
-	// 		current_order.filled += amt_of_shares_to_fill * max_price;
-	// 		current_order.amt_of_shares_filled += amt_of_shares_to_fill;
-	// 		amt_of_shares_to_fill -= amt_of_shares_to_fill;
-	// 	}
-		
-	// 	return self.fill_matching_orders(amt_of_shares_to_fill, max_price);
-	// }
-
-	fn delete_orders(&mut self, orders: Vec<u64>) {
-		for order_id in orders {
-			self.remove_order(order_id)
-		}
-	}
-
-	pub fn fill_order(&mut self, order: &mut Order, fill_amt: u64, shares_filled: u64) {
-		order.amt_of_shares_filled = order.amt_of_shares_filled + shares_filled;
-		order.filled = order.filled + fill_amt;
-	}
-
-	// Consider recursion
 	fn find_and_add_parent(&mut self, new_order: Order) -> Order {
 		let mut order_id_optional = self.root;
 		let mut parent_order = None;
@@ -188,8 +160,6 @@ impl Orderbook {
 
 		while parent_order.is_none() {
 			let order = self.open_orders.get(&order_id_optional.unwrap()).unwrap();
-
-			// Else statement code is duplicate.
 			if order.is_better_price_than(new_order.to_owned()) {
 				if !order.worse_order_id.is_none() {
 					order_id_optional = order.worse_order_id;
@@ -220,5 +190,9 @@ impl Orderbook {
 		} else {
 			parent_order.better_order_id = Some(child.id)
 		}
+	}
+
+	pub fn get_spend_by(&self, from: String) -> u64 {
+		return *self.spend_by_user.get(&from).unwrap_or(&0);
 	}
 }
