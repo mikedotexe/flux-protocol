@@ -231,11 +231,11 @@ mod tests {
 		}
 	}
 
-	// mod init_tests;
-	// mod bst_tests;
-	// mod market_order_tests;
-	// mod binary_order_matching_tests;
-	// mod categorical_market_tests;
+	mod init_tests;
+	mod bst_tests;
+	mod market_order_tests;
+	mod binary_order_matching_tests;
+	mod categorical_market_tests;
 	mod test_market_resolution;
 
 

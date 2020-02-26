@@ -7,7 +7,7 @@ fn test_categorical_market_matches() {
 	contract.claim_fdai();
 	contract.create_market(4, "Hi!".to_string(), 100010101001010);
 
-	contract.place_order(0, 0, 10000, 70);
+	contract.place_order(0, 0, 70000, 70);
 	contract.place_order(0, 0, 10000, 70);
 	contract.place_order(0, 1, 10000, 10); 
 	contract.place_order(0, 2, 10000, 10); 

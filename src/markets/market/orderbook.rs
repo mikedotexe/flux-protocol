@@ -89,31 +89,34 @@ impl Orderbook {
 	}
 
 	pub fn remove_order(&mut self, order_id: u64) -> u64 {
-		// if the order has been filled a littlebit push it to filled_orders
 		let order = self.open_orders.get_mut(&order_id).unwrap();
 		let outstanding_spend = order.spend - order.filled;
 		*self.spend_by_user.get_mut(&order.creator).unwrap() -= outstanding_spend;
 		let parent = order.parent;
 		let better_order_id = order.better_order_id;
 		let worse_order_id = order.worse_order_id;
-		
 		if order.amt_of_shares_filled > 0 {
 			self.filled_orders.insert(order.id, order.to_owned());
 		}
-
+		
 		if (Some(order_id) == self.market_order) {
 			self.remove_market_order();
 		}
 		// If removed order is root
 		if parent.is_none() {
+			
 			self.root = better_order_id;
-
+			
 			if !better_order_id.is_none() {
 				let better_order = self.open_orders.get_mut(&better_order_id.unwrap()).unwrap();
 				better_order.parent = None;
-			}
-			if !worse_order_id.is_none() {
-				self.update_and_replace_order(worse_order_id);
+				if !worse_order_id.is_none() {
+					self.update_and_replace_order(worse_order_id);
+				}
+			} else if !worse_order_id.is_none() {
+				self.root = worse_order_id;
+				let worse_order = self.open_orders.get_mut(&worse_order_id.unwrap()).unwrap();
+				worse_order.parent = None;
 			}
 		} 
 		else {
@@ -126,7 +129,7 @@ impl Orderbook {
 				self.update_and_replace_order(better_order_id);
 			}
 		}
-
+		
 		
 		self.open_orders.remove(&order_id);
 		return outstanding_spend;
@@ -144,7 +147,6 @@ impl Orderbook {
 	// TODO: Should catch these rounding errors earlier, right now some "dust" will be lost.
 	pub fn fill_market_order(&mut self, mut amt_of_shares_to_fill: u64) {
 		let current_order = self.open_orders.get_mut(&self.market_order.unwrap()).unwrap();
-
 		current_order.amt_of_shares_filled += amt_of_shares_to_fill;
 		current_order.filled += amt_of_shares_to_fill * current_order.price_per_share;
 		if current_order.spend - current_order.filled < 100 { // some rounding erros here might cause some stack overflow bugs that's why this is build in.
@@ -157,7 +159,7 @@ impl Orderbook {
 		let mut order_id_optional = self.root;
 		let mut parent_order = None;
 		let mut updated_order = new_order.to_owned();
-
+		
 		while parent_order.is_none() {
 			let order = self.open_orders.get(&order_id_optional.unwrap()).unwrap();
 			if order.is_better_price_than(new_order.to_owned()) {
@@ -190,6 +192,31 @@ impl Orderbook {
 		} else {
 			parent_order.better_order_id = Some(child.id)
 		}
+	}
+
+	pub fn calc_claimable_amt(&self, from: String) -> u64 {
+		let mut claimable = 0;
+		for (_, order) in self.open_orders.iter() {
+			if order.creator == from {
+				claimable += order.amt_of_shares_filled * 100;
+			}
+		}
+		for (_, order) in self.filled_orders.iter() {
+			if order.creator == from {
+				claimable += order.amt_of_shares_filled * 100;
+			}
+		}
+		return claimable;
+	}
+
+	pub fn get_open_order_value_for(&self, from: String) -> u64 {
+		let mut claimable = 0;
+		for (_, order) in self.open_orders.iter() {
+			if order.creator == from {
+				claimable += order.spend - order.filled;
+			}
+		}
+		return claimable;
 	}
 
 	pub fn get_spend_by(&self, from: String) -> u64 {
