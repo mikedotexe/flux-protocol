@@ -1,13 +1,14 @@
 use near_bindgen::{near_bindgen, env};
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::collections::{BTreeMap, HashMap};
+use serde::{Deserialize, Serialize};
 
 mod market;
 type Market = market::Market;
 type Order = market::orderbook::order::Order;
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, Debug)]
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 struct Markets {
 	creator: String,
 	active_markets: BTreeMap<u64, Market>,

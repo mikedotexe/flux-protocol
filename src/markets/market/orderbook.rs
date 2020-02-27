@@ -2,12 +2,13 @@ use std::collections::{BTreeMap, HashMap};
 use std::panic;
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_bindgen::{near_bindgen};
+use serde::{Deserialize, Serialize};
 
 pub mod order;
 pub type Order = order::Order;
 
 #[near_bindgen]
-#[derive(Default, BorshDeserialize, BorshSerialize, Debug)]
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Orderbook {
 	pub root: Option<u64>,
 	pub market_order: Option<u64>,
@@ -50,9 +51,9 @@ impl Orderbook {
 		self.set_market_order(order_id, price_per_share);
 
 		if self.root.is_none() {
-			self.root = Some(new_order.to_owned().id);
+			self.root = Some(new_order.clone().id);
 		} else {
-			new_order = self.find_and_add_parent(new_order.to_owned());
+			new_order = self.find_and_add_parent(new_order.clone());
 		}
 
 		self.open_orders.insert(order_id, new_order);
@@ -95,7 +96,7 @@ impl Orderbook {
 		let better_order_id = order.better_order_id;
 		let worse_order_id = order.worse_order_id;
 		if order.amt_of_shares_filled > 0 {
-			self.filled_orders.insert(order.id, order.to_owned());
+			self.filled_orders.insert(order.id, order.clone());
 		}
 		
 		if (Some(order_id) == self.market_order) {
@@ -157,11 +158,11 @@ impl Orderbook {
 	fn find_and_add_parent(&mut self, new_order: Order) -> Order {
 		let mut order_id_optional = self.root;
 		let mut parent_order = None;
-		let mut updated_order = new_order.to_owned();
+		let mut updated_order = new_order.clone();
 		
 		while parent_order.is_none() {
 			let order = self.open_orders.get(&order_id_optional.unwrap()).unwrap();
-			if order.is_better_price_than(new_order.to_owned()) {
+			if order.is_better_price_than(new_order.clone()) {
 				if !order.worse_order_id.is_none() {
 					order_id_optional = order.worse_order_id;
 				} else {
@@ -179,7 +180,7 @@ impl Orderbook {
 
 		}
 		
-		self.add_child(parent_order.unwrap().id, updated_order.to_owned());
+		self.add_child(parent_order.unwrap().id, updated_order.clone());
 		return updated_order;
 	}
 

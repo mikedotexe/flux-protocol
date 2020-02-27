@@ -1,7 +1,8 @@
 use std::string::String;
 use borsh::{BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, BorshDeserialize, BorshSerialize, Clone)]
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug, Clone)]
 pub struct Order {
 	pub id: u64,
 	pub creator: String,
