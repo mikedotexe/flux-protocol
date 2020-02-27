@@ -2,7 +2,6 @@ use std::string::String;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use near_bindgen::{near_bindgen, env};
-use serde::{Deserialize, Serialize};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub mod orderbook;
@@ -15,7 +14,7 @@ type Order = orderbook::Order;
 // TODO: Add outcome_tags if outcomes > 2
 // TODO: Add check: outcomes have to be < 20
 #[near_bindgen]
-#[derive(Default, Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
+#[derive(Default, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Market {
 	pub id: u64,
 	pub description: String,
