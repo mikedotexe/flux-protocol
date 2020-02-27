@@ -9,25 +9,29 @@ pub mod orderbook;
 type Orderbook = orderbook::Orderbook;
 type Order = orderbook::Order;
 
+// TODO: Endtime has to be in blocks instead of ms / s
+// TODO: Add additional_info
+// TODO: Add resolution_url
+// TODO: Add outcome_tags if outcomes > 2
+// TODO: Add check: outcomes have to be < 20
 #[near_bindgen]
 #[derive(Default, Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Market {
 	pub id: u64,
-	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
+	pub description: String,
+	pub extra_info: String,
 	pub creator: String,
 	pub outcomes: u64,
-	pub open_orders: BTreeMap<u64, Order>,
-	pub filled_orders: BTreeMap<u64, Order>,
-	pub description: String,
+	pub outcome_tags: Vec<String>,
 	pub end_time: u64,
-	pub oracle_address: String,
+	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub winning_outcome: Option<u64>,
 	pub resoluted: bool,
 	pub liquidity: u64
 }
 
 impl Market {
-	pub fn new(id: u64, from: String, outcomes: u64, description: String, end_time: u64) -> Self {
+	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, end_time: u64) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
 
 		for i in 0..outcomes {
@@ -36,21 +40,19 @@ impl Market {
 
 		Self {
 			id,
-			orderbooks: empty_orderbooks,
+			description,
+			extra_info,
 			creator: from,
 			outcomes,
-			open_orders: BTreeMap::new(),
-			filled_orders: BTreeMap::new(),
-			description,
+			outcome_tags,
 			end_time, 
-			oracle_address: env::current_account_id(),
+			orderbooks: empty_orderbooks,
 			winning_outcome: None,
 			resoluted: false,
 			liquidity: 0
 		}
 	}
 
-	// Order filling and keeping track of spendages is way to complicated for now.
 	pub fn place_order(&mut self, from: String, outcome: u64, amt_of_shares: u64, spend: u64, price_per_share: u64) {
 		assert_eq!(self.resoluted, false);
 		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price_per_share, amt_of_shares);
@@ -60,7 +62,6 @@ impl Market {
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend, shares_filled);
 	}
 
-	// Recursion here instead of in the orderbook
 	fn fill_matches(&mut self, outcome: u64, mut spend: u64, price_per_share: u64, mut shares_filled: u64) -> (u64, u64) {
 		let market_price = self.get_market_price(outcome);
 		if price_per_share < market_price || spend == 0 { return (spend, shares_filled); }
@@ -160,6 +161,13 @@ impl Market {
 			claimable += winning_orderbook.calc_claimable_amt(from);
 		}
 		return claimable;
+	}
+
+	pub fn delete_orders_for(&mut self, from: String) {
+		for orderbook_id in 0..self.outcomes {
+			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
+			orderbook.delete_orders_for(from.to_string());
+		}
 	}
 
 	fn to_user_outcome_id(&self, user: String, outcome: u64) -> String {

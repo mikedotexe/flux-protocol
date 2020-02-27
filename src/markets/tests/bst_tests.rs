@@ -6,7 +6,7 @@ fn test_bst_additions() {
 	
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market(3, "Hi!".to_string(), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), 100010101001010);
 	
 	contract.place_order(0, 0, 100000, 50);
 	contract.place_order(0, 0, 100000, 30);
@@ -78,7 +78,7 @@ fn test_bst_removal() {
 	
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market(3, "Hi!".to_string(), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), 100010101001010);
 	contract.place_order(0, 0, 100000, 50);
 	contract.place_order(0, 0, 100000, 30);
 	contract.place_order(0, 0, 100000, 60);

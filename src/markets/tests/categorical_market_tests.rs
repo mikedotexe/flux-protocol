@@ -5,7 +5,7 @@ fn test_categorical_market_matches() {
 	testing_env!(get_context(carol()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market(4, "Hi!".to_string(), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), 100010101001010);
 
 	contract.place_order(0, 0, 70000, 70);
 	contract.place_order(0, 0, 10000, 70);

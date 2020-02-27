@@ -57,21 +57,20 @@ impl Markets {
 		return true;
 	}
 
-	pub fn get_fdai_balance(&self, from: String) -> &u64 {
-		return self.fdai_balances.get(&from).unwrap();
+	pub fn get_fdai_balance(&self, from: String) -> u64 {
+		return *self.fdai_balances.get(&from).unwrap();
 	}
-	
-	pub fn create_market(&mut self, outcomes: u64, description: String, end_time: u64) -> bool {
-		// TODO: Do some market validation
+
+	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, end_time: u64) -> bool {
+		assert!(outcomes == 2 || outcomes == outcome_tags.len() as u64);
+		assert!(outcomes < 20); // up for change
+		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
+		// TODO check if end_time hasn't happened yet
 		let from = env::predecessor_account_id();
-		// if from == self.creator {
-			let new_market = Market::new(self.nonce, from, outcomes, description.to_string(), end_time);
-			self.active_markets.insert(self.nonce, new_market);
-			self.nonce = self.nonce + 1;
-			return true;
-		// } else {
-		// 	return false;
-		// }
+		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, end_time);
+		self.active_markets.insert(self.nonce, new_market);
+		self.nonce = self.nonce + 1;
+		return true;
 	}
 
 	pub fn delete_market(&mut self, market_id: u64) -> bool {
@@ -153,6 +152,17 @@ impl Markets {
 		return self.active_markets.get(&market_id).unwrap().get_claimable(from);	
 	}
 
+	pub fn claim_earnings(&mut self, market_id: u64) {
+		let from = env::predecessor_account_id();
+		let market = self.active_markets.get_mut(&market_id).unwrap();
+		assert_eq!(market.resoluted, true);
+		
+		let claimable = market.get_claimable(from.to_string());	
+		market.delete_orders_for(from);
+
+		self.add_balance(claimable);
+	}
+
 	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> { 
 		return &self.active_markets;
 	}
@@ -211,6 +221,19 @@ mod tests {
 		return "bob.near".to_string();
 	} 
 
+	fn empty_string() -> String {
+		return "".to_string();
+	}
+
+	fn outcome_tags(number_of_outcomes: u64) -> Vec<String> {
+		let mut outcomes: Vec<String> = vec![];
+		for _ in 0..number_of_outcomes {
+			outcomes.push(empty_string());
+		}
+		return outcomes;
+	}
+
+
 	fn get_context(predecessor_account_id: String) -> VMContext {
 		VMContext {
 			current_account_id: alice(),
@@ -236,7 +259,6 @@ mod tests {
 	mod market_order_tests;
 	mod binary_order_matching_tests;
 	mod categorical_market_tests;
-	mod test_market_resolution;
-
-
+	mod market_resolution_tests;
+	mod claim_earnings_tests;
 }

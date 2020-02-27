@@ -209,6 +209,37 @@ impl Orderbook {
 		return claimable;
 	}
 
+	pub fn delete_orders_for(&mut self, from: String) {
+		let mut open_orders_to_delete = vec![];
+		let mut filled_orders_to_delete = vec![];
+
+		for (_, order) in &mut self.open_orders {
+			if order.creator == from {
+				open_orders_to_delete.push(order.id);
+			}
+		}
+
+		for (_, order) in &mut self.filled_orders {
+			if order.creator == from {
+				filled_orders_to_delete.push(order.id);
+			}
+		}
+
+		self.delete_open_orders(open_orders_to_delete);
+		self.delete_filled_orders(filled_orders_to_delete);
+	}
+
+	fn delete_filled_orders(&mut self, order_ids: Vec<u64>) {
+		for order_id in order_ids {
+			self.filled_orders.remove(&order_id);
+		}
+	}
+	fn delete_open_orders(&mut self, order_ids: Vec<u64>) {
+		for order_id in order_ids {
+			self.open_orders.remove(&order_id);
+		}
+	}
+
 	pub fn get_open_order_value_for(&self, from: String) -> u64 {
 		let mut claimable = 0;
 		for (_, order) in self.open_orders.iter() {

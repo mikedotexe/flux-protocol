@@ -5,7 +5,7 @@ fn test_invalid_market_payout_calc() {
 	testing_env!(get_context(carol()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market(4, "Hi!".to_string(), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), 100010101001010);
 
 	let rounded_10k_at_70 = (10000 / 70) * 70;
 	let mut amount_filled_after_cancel = 10000 - 2840;
@@ -68,7 +68,7 @@ fn test_valid_market_payout_calc() {
 	testing_env!(get_context(carol()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market(4, "Hi!".to_string(), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), 100010101001010);
 
 	contract.place_order(0, 0, 30000, 70);
 	
