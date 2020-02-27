@@ -171,6 +171,10 @@ impl Markets {
 		return market.unwrap();
 	}
 
+	pub fn get_owner(&self) -> String {
+		return self.creator.to_string();
+	}
+
 	pub fn get_market_order(&self, market_id: u64, outcome: u64)  -> Option<u128> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		return market.orderbooks[&outcome].market_order;
