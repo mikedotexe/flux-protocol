@@ -57,21 +57,20 @@ impl Markets {
 		return true;
 	}
 
-	pub fn get_fdai_balance(&self, from: String) -> &u64 {
-		return self.fdai_balances.get(&from).unwrap();
+	pub fn get_fdai_balance(&self, from: String) -> u64 {
+		return *self.fdai_balances.get(&from).unwrap();
 	}
-	
-	pub fn create_market(&mut self, outcomes: u64, description: String, end_time: u64) -> bool {
-		// TODO: Do some market validation
+
+	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, end_time: u64) -> bool {
+		assert!(outcomes == 2 || outcomes == outcome_tags.len() as u64);
+		assert!(outcomes < 20); // up for change
+		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
+		// TODO check if end_time hasn't happened yet
 		let from = env::predecessor_account_id();
-		// if from == self.creator {
-			let new_market = Market::new(self.nonce, from, outcomes, description.to_string(), end_time);
-			self.active_markets.insert(self.nonce, new_market);
-			self.nonce = self.nonce + 1;
-			return true;
-		// } else {
-		// 	return false;
-		// }
+		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, end_time);
+		self.active_markets.insert(self.nonce, new_market);
+		self.nonce = self.nonce + 1;
+		return true;
 	}
 
 	pub fn delete_market(&mut self, market_id: u64) -> bool {
@@ -85,41 +84,34 @@ impl Markets {
 		}
 	}
 
-	pub fn place_order(&mut self, market_id: u64, outcome: u64, spend: u64, price_per_share: u64) -> bool {
+	pub fn place_order(&mut self, market_id: u64, outcome: u64, spend: u64, price_per_share: u64) {
 		let from = env::predecessor_account_id();
 		let balance = self.fdai_balances.get(&from).unwrap();
 		assert!(balance >= &spend);
 		
 		let amount_of_shares = spend / price_per_share;
-		let actualized_spend = amount_of_shares * price_per_share;
+		let rounded_spend = amount_of_shares * price_per_share;
+		let market = self.active_markets.get_mut(&market_id).unwrap();
+		market.place_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price_per_share);
 
-		self.active_markets.entry(market_id).and_modify(|market| {
-			market.place_order(from.to_string(), outcome, amount_of_shares, actualized_spend, price_per_share);
-		});
-
-		self.subtract_balance(actualized_spend);
-		return true;
+		self.subtract_balance(rounded_spend);
 	}
 
-	pub fn resolute(&mut self, market_id: u64, payout: Vec<u64>, invalid: bool) -> bool {
+	pub fn cancel_order(&mut self, market_id: u64, outcome: u64, order_id: u64) {
 		let from = env::predecessor_account_id();
-		let mut resoluted = false;
-		self.active_markets.entry(market_id).and_modify(|market| {
-			assert_eq!(market.creator, from);
-			market.resolute(payout, invalid);
-		});
-		return resoluted;
+		let market = self.active_markets.get_mut(&market_id).unwrap();
+		assert_eq!(market.resoluted, false);
+		let orderbook = market.orderbooks.get_mut(&outcome).unwrap();
+		let order = orderbook.open_orders.get(&order_id).unwrap();
+		assert_eq!(order.creator, from);
+		let outstanding_spend = orderbook.remove_order(order_id);
+		self.add_balance(outstanding_spend)
 	}
 
-	pub fn claim_earnings(&mut self, market_id: u64) {
+	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
 		let from = env::predecessor_account_id();
-		let mut earnings = 0;
-		self.active_markets.entry(market_id).and_modify(|market| {
-			earnings = market.claim_earnings(from.to_string());
-		});
-
-		assert!(earnings > 0);
-		self.add_balance(earnings)
+		let market = self.active_markets.get_mut(&market_id).unwrap();
+		market.resolute(from, winning_outcome);
 	}
 
 	fn subtract_balance(&mut self, amount: u64) {
@@ -144,22 +136,31 @@ impl Markets {
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
 	}
 
-	pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> Vec<Order> {
+	pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u64, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
-		return market.get_open_orders_for_user(from, outcome);
+		let orderbook = market.orderbooks.get(&outcome).unwrap();
+		return &orderbook.open_orders;
 	}
 	
-	pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> Vec<Order> {
+	pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u64, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
-		return market.get_filled_orders_for_user(from, outcome);
+		let orderbook = market.orderbooks.get(&outcome).unwrap();
+		return &orderbook.filled_orders;
 	}
 
-	pub fn get_earnings(&self, market_id: u64, from: String) -> u64 {
-		return self.active_markets.get(&market_id).unwrap().get_earnings(from, false);	
+	pub fn get_claimable(&self, market_id: u64, from: String) -> u64 {
+		return self.active_markets.get(&market_id).unwrap().get_claimable(from);	
 	}
 
-	pub fn get_owner(&self) -> &String {
-		return &self.creator;
+	pub fn claim_earnings(&mut self, market_id: u64) {
+		let from = env::predecessor_account_id();
+		let market = self.active_markets.get_mut(&market_id).unwrap();
+		assert_eq!(market.resoluted, true);
+		
+		let claimable = market.get_claimable(from.to_string());	
+		market.delete_orders_for(from);
+
+		self.add_balance(claimable);
 	}
 
 	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> { 
@@ -171,11 +172,15 @@ impl Markets {
 		return market.unwrap();
 	}
 
-	pub fn get_market_order(&self, market_id: u64, outcome: u64)  -> Option<&Order> {
-		let market = self.active_markets.get(&market_id);
-		return market.unwrap().orderbooks[&outcome].get_market_order();
+	pub fn get_market_order(&self, market_id: u64, outcome: u64)  -> Option<u64> {
+		let market = self.active_markets.get(&market_id).unwrap();
+		return market.orderbooks[&outcome].market_order;
 	}
 
+	pub fn get_market_price(&self, market_id: u64, outcome: u64) -> u64 {
+		let market = self.active_markets.get(&market_id).unwrap();
+		return market.get_market_price(outcome);
+	}
 	pub fn get_fdai_metrics(&self) -> (u128, u128, u128, u64) {
 		return (self.fdai_circulation, self.fdai_in_protocol, self.fdai_outside_escrow, self.user_count);
 	}
@@ -216,6 +221,19 @@ mod tests {
 		return "bob.near".to_string();
 	} 
 
+	fn empty_string() -> String {
+		return "".to_string();
+	}
+
+	fn outcome_tags(number_of_outcomes: u64) -> Vec<String> {
+		let mut outcomes: Vec<String> = vec![];
+		for _ in 0..number_of_outcomes {
+			outcomes.push(empty_string());
+		}
+		return outcomes;
+	}
+
+
 	fn get_context(predecessor_account_id: String) -> VMContext {
 		VMContext {
 			current_account_id: alice(),
@@ -236,216 +254,11 @@ mod tests {
 		}
 	}
 
-    #[test]
-	fn test_contract_creation() {
-		testing_env!(get_context(carol()));
-		let mut contract = Markets::default(); 
-	}
-
-    #[test]
-	fn test_market_creation() {
-		testing_env!(get_context(carol()));
-		let mut contract = Markets::default(); 
-		contract.create_market(2, "Hi!".to_string(), 100010101001010);
-	}
-
-
-	#[test]
-	fn test_market_orders() {
-		testing_env!(get_context(carol()));
-		
-		let mut contract = Markets::default();
-		contract.claim_fdai();
-		contract.create_market(2, "Hi!".to_string(), 100010101001010);
-		
-		// Placing "no" order
-		contract.place_order(0, 0, 10000, 50);									
-		let market_no_order = contract.get_market_order(0, 0);
-		assert_eq!(market_no_order.is_none(), false);
-		
-		contract.place_order(0, 1, 9000, 50);
-		contract.place_order(0, 1, 1000, 50);
-
-		let market_no_order = contract.get_market_order(0, 0);
-		let market_yes_order = contract.get_market_order(0, 1);
-		assert_eq!(market_no_order.is_none(), true);
-		assert_eq!(market_yes_order.is_none(), true);
-	}	
-
-	#[test]
-	fn test_fdai_balances() {
-		testing_env!(get_context(carol()));
-		
-		let mut contract = Markets::default();
-		contract.claim_fdai();
-		let mut balance = contract.get_fdai_balance(carol());
-		let base: u64 = 10;
-		let mut expected_balance = 100 * base.pow(17);
-		let initial_balance = expected_balance;
-
-		assert_eq!(balance, &expected_balance);
-
-		contract.create_market(2, "Hi!".to_string(), 100010101001010);
-		
-		contract.place_order(0, 0, 40000, 40);
-		balance = contract.get_fdai_balance(carol());
-		expected_balance  = expected_balance - 40000;
-		assert_eq!(balance, &expected_balance);
-		
-
-		testing_env!(get_context(bob()));
-		contract.claim_fdai();
-
-		contract.place_order(0, 1, 60000, 60);
-		balance = contract.get_fdai_balance(bob());
-		expected_balance = initial_balance - 60000;
-		assert_eq!(balance, &expected_balance);
-
-		testing_env!(get_context(carol()));
-		contract.resolute(0, vec![10000, 0], false);
-		contract.claim_earnings(0);
-		
-		balance = contract.get_fdai_balance(carol());
-		expected_balance = initial_balance + 60000;
-		assert_eq!(balance, &expected_balance);
-		
-		testing_env!(get_context(bob()));
-		balance = contract.get_fdai_balance(bob());
-		expected_balance = initial_balance - 60000;
-		assert_eq!(balance, &expected_balance);
-	}
-
-	#[test]
-	fn test_payout_open_orders_on_loss() {
-		testing_env!(get_context(carol()));
-		
-		let mut contract = Markets::default();
-		contract.claim_fdai();
-		let mut balance = contract.get_fdai_balance(carol());
-		let base: u64 = 10;
-		let mut expected_balance = 100 * base.pow(17);
-		let initial_balance = expected_balance;
-
-		assert_eq!(balance, &expected_balance);
-
-		contract.create_market(2, "Hi!".to_string(), 100010101001010);
-		
-		contract.place_order(0, 0, 10000, 10);
-		contract.place_order(0, 0, 20000, 50);
-		
-		testing_env!(get_context(bob()));
-		contract.claim_fdai();
-		
-		contract.place_order(0, 1, 21000, 50);
-		contract.place_order(0, 1, 10000, 90);
-		
-		testing_env!(get_context(carol()));
-		contract.resolute(0, vec![10000, 0], false); // carol wins
-		// contract.claim_earnings(0);
-		
-		let claimable_carol = contract.get_earnings(0, carol());
-		let claimable_bob = contract.get_earnings(0, bob());
-		let expected_carol = 20000 + 40000;
-		let expected_bob = 1000;
-		let carol_delta = expected_carol - claimable_carol;
-		let bob_delta = expected_bob - claimable_bob;
-		assert!(carol_delta <= 100);
-		assert!(bob_delta <= 100);
-
-	}
-
-	#[test]
-	fn test_invalid_market() {
-		testing_env!(get_context(carol()));
-		
-		let mut contract = Markets::default();
-		contract.claim_fdai();
-		contract.create_market(2, "Hi!".to_string(), 100010101001010);
-		
-		contract.place_order(0, 0, 7321893, 70);
-
-		testing_env!(get_context(bob()));
-		contract.claim_fdai();
-		contract.place_order(0, 1, 1232173, 30);
-
-		testing_env!(get_context(carol()));
-		contract.resolute(0, vec![5000, 5000], true);
-		let carol_earnings = contract.get_earnings(0, carol());
-		let bob_earnings = contract.get_earnings(0, bob());
-
-		println!("carol earnings: {} bob earnigns: {}", carol_earnings, bob_earnings);
-		// assert_eq!(bob_earnings, 50000);
-		let carol_old_balance = contract.get_fdai_balance(carol());
-		contract.claim_earnings(0);
-		println!(" ");
-		let carol_new_balance = contract.get_fdai_balance(carol());
-		println!("Carol's new balance {}" , carol_new_balance);
-	}
-	
-	#[test]
-	fn test_get_open_orders() {
-		testing_env!(get_context(carol()));
-		
-		let mut contract = Markets::default(); 
-		contract.claim_fdai();
-		contract.create_market(2, "Hi!".to_string(), 100010101001010);
-		
-		contract.place_order(0, 0, 40000, 40);
-		contract.place_order(0, 0, 40000, 40);
-		contract.place_order(0, 0, 40000, 40);
-		contract.place_order(0, 0, 40000, 40);
-		contract.place_order(0, 0, 40000, 40);
-
-		let open_orders = contract.get_open_orders(0, 0, carol());
-		assert_eq!(open_orders.len(), 5);
-	}
-
-	#[test]
-	fn test_get_filled_orders() {
-		testing_env!(get_context(carol()));
-		
-		let mut contract = Markets::default();
-		contract.claim_fdai();
-		contract.create_market(2, "Hi!".to_string(), 100010101001010);
-		
-		contract.place_order(0, 0, 40000, 40);
-		contract.place_order(0, 1, 60000, 60);
-
-		contract.place_order(0, 0, 40000, 40);
-		contract.place_order(0, 0, 40000, 40);
-		contract.place_order(0, 0, 40000, 40);
-		contract.place_order(0, 0, 40000, 40);
-
-		let open_orders = contract.get_open_orders(0, 0, carol());
-		let filled_orders = contract.get_filled_orders(0, 0, carol());
-		assert_eq!(open_orders.len(), 4);
-		assert_eq!(filled_orders.len(), 1);
-	}
-
-	#[test]
-	fn test_decimal_division_results() {
-		testing_env!(get_context(carol()));
-		
-		let mut contract = Markets::default();
-		contract.claim_fdai();
-		contract.create_market(2, "Hi!".to_string(), 100010101001010);
-		
-		contract.place_order(0, 0, 1782361, 77);									
-
-		testing_env!(get_context(bob()));
-		contract.claim_fdai();
-
-		contract.place_order(0, 1, 123123123, 23);
-
-		testing_env!(get_context(carol()));
-		contract.resolute(0, vec![0, 10000], false);
-		
-		testing_env!(get_context(bob()));
-		contract.claim_earnings(0);
-		let bob_balance = contract.get_fdai_balance(bob());
-
-		testing_env!(get_context(carol()));
-		let carol_balance = contract.get_fdai_balance(carol());
-	}	
-
+	mod init_tests;
+	mod bst_tests;
+	mod market_order_tests;
+	mod binary_order_matching_tests;
+	mod categorical_market_tests;
+	mod market_resolution_tests;
+	mod claim_earnings_tests;
 }
