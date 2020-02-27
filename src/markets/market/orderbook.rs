@@ -1,14 +1,13 @@
 use std::collections::{BTreeMap, HashMap};
 use std::panic;
 use borsh::{BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Serialize};
 use near_bindgen::{near_bindgen};
 
 pub mod order;
 pub type Order = order::Order;
 
 #[near_bindgen]
-#[derive(Default, Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
+#[derive(Default, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Orderbook {
 	pub root: Option<u64>,
 	pub market_order: Option<u64>,

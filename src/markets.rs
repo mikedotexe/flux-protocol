@@ -1,7 +1,5 @@
-use std::string::String;
 use near_bindgen::{near_bindgen, env};
 use borsh::{BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
 mod market;
@@ -9,7 +7,7 @@ type Market = market::Market;
 type Order = market::orderbook::order::Order;
 
 #[near_bindgen]
-#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
+#[derive(BorshDeserialize, BorshSerialize, Debug)]
 struct Markets {
 	creator: String,
 	active_markets: BTreeMap<u64, Market>,
@@ -247,8 +245,8 @@ mod tests {
             storage_usage: 0,
 			block_timestamp: 123789,
 			account_locked_balance: 0,
-            attached_deposit: 500000000,
-            prepaid_gas: 10u64.pow(9),
+            attached_deposit: 0,
+            prepaid_gas: 10u64.pow(11),
             random_seed: vec![0, 1, 2],
             output_data_receivers: vec![],
 		}
