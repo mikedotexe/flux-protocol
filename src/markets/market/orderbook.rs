@@ -10,12 +10,12 @@ pub type Order = order::Order;
 #[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Orderbook {
-	pub root: Option<u64>,
-	pub market_order: Option<u64>,
-	pub open_orders: BTreeMap<u64, Order>,
-	pub filled_orders: BTreeMap<u64, Order>,
-	pub spend_by_user: BTreeMap<String, u64>,
-	pub nonce: u64,
+	pub root: Option<u128>,
+	pub market_order: Option<u128>,
+	pub open_orders: BTreeMap<u128, Order>,
+	pub filled_orders: BTreeMap<u128, Order>,
+	pub spend_by_user: BTreeMap<String, u128>,
+	pub nonce: u128,
 	pub outcome_id: u64
 }
 // TODO: Market orders are broken - don't update correctly
@@ -32,13 +32,13 @@ impl Orderbook {
 		}
 	}
 
-	fn new_order_id(&mut self) -> u64 {
+	fn new_order_id(&mut self) -> u128 {
 		let id = self.nonce;
 		self.nonce = self.nonce + 1;
 		return id;
 	}
 
-	pub fn place_order(&mut self, from: String, outcome: u64, spend: u64, amt_of_shares: u64, price_per_share: u64, filled: u64, amt_of_shares_filled: u64) {
+	pub fn place_order(&mut self, from: String, outcome: u64, spend: u128, amt_of_shares: u128, price_per_share: u128, filled: u128, amt_of_shares_filled: u128) {
 		let order_id = self.new_order_id();
 		let mut new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price_per_share, filled, amt_of_shares_filled);
 		*self.spend_by_user.entry(from.to_string()).or_insert(0) += spend;
@@ -59,7 +59,7 @@ impl Orderbook {
 		self.open_orders.insert(order_id, new_order);
 	}
 
-	fn set_market_order(&mut self, order_id: u64, price_per_share: u64) {
+	fn set_market_order(&mut self, order_id: u128, price_per_share: u128) {
 		let current_market_order_id = self.market_order;
 		if current_market_order_id.is_none() {
 			self.market_order = Some(order_id);
@@ -88,7 +88,7 @@ impl Orderbook {
 		}
 	}
 
-	pub fn remove_order(&mut self, order_id: u64) -> u64 {
+	pub fn remove_order(&mut self, order_id: u128) -> u128 {
 		let order = self.open_orders.get_mut(&order_id).unwrap();
 		let outstanding_spend = order.spend - order.filled;
 		*self.spend_by_user.get_mut(&order.creator).unwrap() -= outstanding_spend;
@@ -135,7 +135,7 @@ impl Orderbook {
 		return outstanding_spend;
 	}
 
-	fn update_and_replace_order(&mut self, order_id: Option<u64>) {
+	fn update_and_replace_order(&mut self, order_id: Option<u128>) {
 		if !order_id.is_none() {
 			let order = self.open_orders.get_mut(&order_id.unwrap()).unwrap().to_owned();
 			let updated_order = self.find_and_add_parent(order);
@@ -145,7 +145,7 @@ impl Orderbook {
 	}
 	
 	// TODO: Should catch these rounding errors earlier, right now some "dust" will be lost.
-	pub fn fill_market_order(&mut self, mut amt_of_shares_to_fill: u64) {
+	pub fn fill_market_order(&mut self, mut amt_of_shares_to_fill: u128) {
 		let current_order = self.open_orders.get_mut(&self.market_order.unwrap()).unwrap();
 		current_order.amt_of_shares_filled += amt_of_shares_to_fill;
 		current_order.filled += amt_of_shares_to_fill * current_order.price_per_share;
@@ -184,7 +184,7 @@ impl Orderbook {
 		return updated_order;
 	}
 
-	fn add_child(&mut self, parent_id: u64, child: Order) {
+	fn add_child(&mut self, parent_id: u128, child: Order) {
 		let parent_order = self.open_orders.get_mut(&parent_id).unwrap();
 	
 		if parent_order.is_better_price_than(child.to_owned()) {
@@ -194,7 +194,7 @@ impl Orderbook {
 		}
 	}
 
-	pub fn calc_claimable_amt(&self, from: String) -> u64 {
+	pub fn calc_claimable_amt(&self, from: String) -> u128 {
 		let mut claimable = 0;
 		for (_, order) in self.open_orders.iter() {
 			if order.creator == from {
@@ -229,18 +229,18 @@ impl Orderbook {
 		self.delete_filled_orders(filled_orders_to_delete);
 	}
 
-	fn delete_filled_orders(&mut self, order_ids: Vec<u64>) {
+	fn delete_filled_orders(&mut self, order_ids: Vec<u128>) {
 		for order_id in order_ids {
 			self.filled_orders.remove(&order_id);
 		}
 	}
-	fn delete_open_orders(&mut self, order_ids: Vec<u64>) {
+	fn delete_open_orders(&mut self, order_ids: Vec<u128>) {
 		for order_id in order_ids {
 			self.open_orders.remove(&order_id);
 		}
 	}
 
-	pub fn get_open_order_value_for(&self, from: String) -> u64 {
+	pub fn get_open_order_value_for(&self, from: String) -> u128 {
 		let mut claimable = 0;
 		for (_, order) in self.open_orders.iter() {
 			if order.creator == from {
@@ -250,7 +250,7 @@ impl Orderbook {
 		return claimable;
 	}
 
-	pub fn get_spend_by(&self, from: String) -> u64 {
+	pub fn get_spend_by(&self, from: String) -> u128 {
 		return *self.spend_by_user.get(&from).unwrap_or(&0);
 	}
 }

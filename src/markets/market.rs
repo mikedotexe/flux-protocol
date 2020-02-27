@@ -27,7 +27,7 @@ pub struct Market {
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub winning_outcome: Option<u64>,
 	pub resoluted: bool,
-	pub liquidity: u64
+	pub liquidity: u128
 }
 
 impl Market {
@@ -53,7 +53,7 @@ impl Market {
 		}
 	}
 
-	pub fn place_order(&mut self, from: String, outcome: u64, amt_of_shares: u64, spend: u64, price_per_share: u64) {
+	pub fn place_order(&mut self, from: String, outcome: u64, amt_of_shares: u128, spend: u128, price_per_share: u128) {
 		assert_eq!(self.resoluted, false);
 		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price_per_share, amt_of_shares);
 		let total_spend = spend - spend_filled;
@@ -62,12 +62,12 @@ impl Market {
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend, shares_filled);
 	}
 
-	fn fill_matches(&mut self, outcome: u64, mut spend: u64, price_per_share: u64, mut shares_filled: u64) -> (u64, u64) {
+	fn fill_matches(&mut self, outcome: u64, mut spend: u128, price_per_share: u128, mut shares_left_to_fill: u128) -> (u128, u128) {
 		let market_price = self.get_market_price(outcome);
-		if price_per_share < market_price || spend == 0 { return (spend, shares_filled); }
+		if price_per_share < market_price || spend == 0 { return (spend, shares_left_to_fill); }
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		let shares_fillable = self.get_min_shares_fillable(outcome);
-		let mut shares_to_fill = shares_filled;
+		let mut shares_to_fill = shares_left_to_fill;
 
 		if shares_fillable < shares_to_fill {
 			shares_to_fill = shares_fillable;
@@ -81,12 +81,12 @@ impl Market {
 		}
 
 		spend -= shares_to_fill * market_price;
-		shares_filled -= shares_to_fill;
+		shares_left_to_fill -= shares_to_fill;
 		
-		return self.fill_matches(outcome, spend, price_per_share, shares_filled);
+		return self.fill_matches(outcome, spend, price_per_share, shares_left_to_fill);
 	}
 
-	pub fn get_min_shares_fillable(&self, outcome: u64) -> u64 {
+	pub fn get_min_shares_fillable(&self, outcome: u64) -> u128 {
 		let mut shares = None;
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		for orderbook_id in orderbook_ids {
@@ -106,7 +106,7 @@ impl Market {
 		return shares.unwrap();
 	}
 
-	pub fn get_market_price(&self, outcome: u64) -> u64 {
+	pub fn get_market_price(&self, outcome: u64) -> u128 {
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		let mut market_price = 100;
 
@@ -144,7 +144,7 @@ impl Market {
 		self.resoluted = true;
 	}
 	
-	pub fn get_claimable(&self, from: String) -> u64 {
+	pub fn get_claimable(&self, from: String) -> u128 {
 		assert_eq!(self.resoluted, true);
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
@@ -168,14 +168,6 @@ impl Market {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
 			orderbook.delete_orders_for(from.to_string());
 		}
-	}
-
-	fn to_user_outcome_id(&self, user: String, outcome: u64) -> String {
-		return format!("{}{}", user, outcome.to_string());
-	}
-
-	fn is_valid_payout(&self, payout_multipliers: &Vec<u64>, invalid: &bool) -> bool {
-		return (payout_multipliers[0] == 10000 && payout_multipliers[1] == 0 && invalid == &false) || (payout_multipliers[0] == 0 && payout_multipliers[1] == 10000 && invalid == &false) || (payout_multipliers[0] == 5000 && payout_multipliers[1] == 5000 && invalid == &true);
 	}
 }
 

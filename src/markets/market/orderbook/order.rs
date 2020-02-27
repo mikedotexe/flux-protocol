@@ -4,22 +4,22 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug, Clone)]
 pub struct Order {
-	pub id: u64,
+	pub id: u128,
 	pub creator: String,
 	pub outcome: u64,
-	pub spend: u64,
-	pub amt_of_shares: u64,
-	pub price_per_share: u64,
-	pub filled: u64,
-	pub amt_of_shares_filled: u64,
-	pub parent: Option<u64>,
-	pub better_order_id: Option<u64>,
-	pub worse_order_id: Option<u64>,
+	pub spend: u128,
+	pub amt_of_shares: u128,
+	pub price_per_share: u128,
+	pub filled: u128,
+	pub amt_of_shares_filled: u128,
+	pub parent: Option<u128>,
+	pub better_order_id: Option<u128>,
+	pub worse_order_id: Option<u128>,
 }
 
 
 impl Order {
-	pub fn new(creator: String, outcome: u64, id: u64, spend:u64, amt_of_shares: u64, price_per_share: u64, filled: u64, amt_of_shares_filled: u64) -> Self {
+	pub fn new(creator: String, outcome: u64, id: u128, spend:u128, amt_of_shares: u128, price_per_share: u128, filled: u128, amt_of_shares_filled: u128) -> Self {
 		Order {
 			id,
 			creator,
