@@ -61,6 +61,7 @@ impl Markets {
 	}
 
 	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, end_time: u64) -> bool {
+		assert!(outcomes > 1);
 		assert!(outcomes == 2 || outcomes == outcome_tags.len() as u64);
 		assert!(outcomes < 20); // up for change
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
@@ -184,6 +185,13 @@ impl Markets {
 		let market = self.active_markets.get(&market_id).unwrap();
 		return market.get_market_price(outcome);
 	}
+
+
+	pub fn get_market_prices(&self, market_id: u64) -> BTreeMap<u64, u128> {
+		let market = self.active_markets.get(&market_id).unwrap();
+		return market.get_market_prices();
+	}
+
 	pub fn get_fdai_metrics(&self) -> (u128, u128, u128, u64) {
 		return (self.fdai_circulation, self.fdai_in_protocol, self.fdai_outside_escrow, self.user_count);
 	}

@@ -10,10 +10,7 @@ type Orderbook = orderbook::Orderbook;
 type Order = orderbook::Order;
 
 // TODO: Endtime has to be in blocks instead of ms / s
-// TODO: Add additional_info
 // TODO: Add resolution_url
-// TODO: Add outcome_tags if outcomes > 2
-// TODO: Add check: outcomes have to be < 20
 #[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Market {
@@ -104,6 +101,15 @@ impl Market {
 		}
 
 		return shares.unwrap();
+	}
+
+	pub fn get_market_prices(&self) -> BTreeMap<u64, u128> {
+		let mut market_prices: BTreeMap<u64, u128> = BTreeMap::new();
+		for outcome in 0..self.outcomes {
+			let market_price = self.get_market_price(outcome);
+			market_prices.insert(outcome, market_price);
+		}
+		return market_prices;
 	}
 
 	pub fn get_market_price(&self, outcome: u64) -> u128 {
