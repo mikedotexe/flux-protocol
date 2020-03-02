@@ -1,7 +1,7 @@
 use std::string::String;
 use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
-use near_bindgen::{near_bindgen, env};
+use std::collections::HashMap;
+use near_bindgen::{near_bindgen};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +20,7 @@ pub struct Market {
 	pub creator: String,
 	pub outcomes: u64,
 	pub outcome_tags: Vec<String>,
+	pub last_price_for_outcomes: HashMap<u64, u128>,
 	pub end_time: u64,
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub winning_outcome: Option<u64>,
@@ -42,7 +43,8 @@ impl Market {
 			creator: from,
 			outcomes,
 			outcome_tags,
-			end_time, 
+			last_price_for_outcomes: HashMap::new(),
+			end_time,
 			orderbooks: empty_orderbooks,
 			winning_outcome: None,
 			resoluted: false,
@@ -51,9 +53,12 @@ impl Market {
 	}
 
 	pub fn place_order(&mut self, from: String, outcome: u64, amt_of_shares: u128, spend: u128, price_per_share: u128) {
+		assert!(spend > 0);
+		assert!(price_per_share > 0 && price_per_share < 100);
 		assert_eq!(self.resoluted, false);
 		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price_per_share, amt_of_shares);
 		let total_spend = spend - spend_filled;
+		if total_spend > 0 { self.last_price_for_outcomes.insert(outcome, price_per_share); }
 		let shares_filled = amt_of_shares - shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend, shares_filled);
