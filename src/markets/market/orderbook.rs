@@ -1,5 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
-use std::panic;
+use std::collections::{BTreeMap};
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_bindgen::{near_bindgen};
 use serde::{Deserialize, Serialize};
@@ -18,7 +17,6 @@ pub struct Orderbook {
 	pub nonce: u128,
 	pub outcome_id: u64
 }
-// TODO: Market orders are broken - don't update correctly
 impl Orderbook {
 	pub fn new(outcome: u64) -> Self {
 		Self {
@@ -99,7 +97,7 @@ impl Orderbook {
 			self.filled_orders.insert(order.id, order.clone());
 		}
 		
-		if (Some(order_id) == self.market_order) {
+		if Some(order_id) == self.market_order {
 			self.remove_market_order();
 		}
 		// If removed order is root
@@ -212,7 +210,7 @@ impl Orderbook {
 	pub fn delete_orders_for(&mut self, from: String) {
 		let mut open_orders_to_delete = vec![];
 		let mut filled_orders_to_delete = vec![];
-
+		self.spend_by_user.insert(from.to_string(), 0);
 		for (_, order) in &mut self.open_orders {
 			if order.creator == from {
 				open_orders_to_delete.push(order.id);
@@ -225,19 +223,17 @@ impl Orderbook {
 			}
 		}
 
-		self.delete_open_orders(open_orders_to_delete);
-		self.delete_filled_orders(filled_orders_to_delete);
-	}
-
-	fn delete_filled_orders(&mut self, order_ids: Vec<u128>) {
-		for order_id in order_ids {
+		for order_id in filled_orders_to_delete {
 			self.filled_orders.remove(&order_id);
 		}
-	}
-	fn delete_open_orders(&mut self, order_ids: Vec<u128>) {
-		for order_id in order_ids {
+		for order_id in open_orders_to_delete {
 			self.open_orders.remove(&order_id);
 		}
+	}
+
+	pub fn get_market_order_price(&self) -> u128 {
+		let market_order = self.open_orders.get(&self.market_order.unwrap()).unwrap();
+		return market_order.price_per_share;
 	}
 
 	pub fn get_open_order_value_for(&self, from: String) -> u128 {

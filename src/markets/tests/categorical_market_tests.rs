@@ -25,5 +25,4 @@ fn test_categorical_market_matches() {
 	// println!("{:?}", open_1_orders);
 	// println!("{:?}", open_2_orders);
 
-	// TODO: write assertions for the orderbook lengths
 }

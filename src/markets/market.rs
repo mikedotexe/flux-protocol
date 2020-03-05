@@ -58,6 +58,7 @@ impl Market {
 		assert_eq!(self.resoluted, false);
 		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price_per_share, amt_of_shares);
 		let total_spend = spend - spend_filled;
+		// TODO: also set last price traded for matching outcomes on fill
 		if total_spend > 0 { self.last_price_for_outcomes.insert(outcome, price_per_share); }
 		let shares_filled = amt_of_shares - shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
@@ -78,6 +79,8 @@ impl Market {
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
 			if !orderbook.market_order.is_none() {
+				let market_order_price = orderbook.get_market_order_price();
+				self.last_price_for_outcomes.insert(orderbook_id, market_order_price);
 				orderbook.fill_market_order(shares_to_fill);
 			}
 		}

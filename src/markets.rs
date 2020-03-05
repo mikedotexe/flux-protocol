@@ -158,7 +158,7 @@ impl Markets {
 		assert_eq!(market.resoluted, true);
 		
 		let claimable = market.get_claimable(from.to_string());	
-		market.delete_orders_for(from);
+		market.delete_orders_for(from.to_string());
 
 		self.add_balance(claimable);
 	}
@@ -185,7 +185,6 @@ impl Markets {
 		let market = self.active_markets.get(&market_id).unwrap();
 		return market.get_market_price(outcome);
 	}
-
 
 	pub fn get_market_prices(&self, market_id: u64) -> BTreeMap<u64, u128> {
 		let market = self.active_markets.get(&market_id).unwrap();
