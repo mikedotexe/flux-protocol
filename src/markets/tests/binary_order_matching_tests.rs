@@ -59,8 +59,8 @@ fn rounding_binary_order_matching_test() {
 	let mut filled_yes_orders = contract.get_filled_orders(0, 1, carol());
 	
 	assert_eq!(open_no_orders.len(), 0);
-	assert_eq!(open_yes_orders.len(), 1);
+	assert_eq!(open_yes_orders.len(), 0);
 	assert_eq!(filled_no_orders.len(), 2);
-	assert_eq!(filled_yes_orders.len(), 1);
+	assert_eq!(filled_yes_orders.len(), 2);
 
 }

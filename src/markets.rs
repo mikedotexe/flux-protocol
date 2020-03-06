@@ -46,7 +46,7 @@ impl Markets {
 		let can_claim = self.fdai_balances.get(&from).is_none();
 		assert!(can_claim);
 		
-		let claim_amount = 100 * self.dai_token();
+		let claim_amount = 1000 * self.dai_token();
 		self.fdai_balances.insert(from, claim_amount);
 
 		// Monitoring total supply - just for testnet
@@ -105,6 +105,7 @@ impl Markets {
 		let order = orderbook.open_orders.get(&order_id).unwrap();
 		assert_eq!(order.creator, from);
 		let outstanding_spend = orderbook.remove_order(order_id);
+		market.liquidity -= outstanding_spend;
 		self.add_balance(outstanding_spend)
 	}
 

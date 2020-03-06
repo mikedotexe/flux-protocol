@@ -11,6 +11,8 @@ type Order = orderbook::Order;
 
 // TODO: Endtime has to be in blocks instead of ms / s
 // TODO: Add resolution_url
+// TODO: When filling an order for a price > market price the tx fails
+// TODO: Share denomination seems off by 1 decimal - don't know if frontend or backend fix
 #[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Market {
@@ -56,21 +58,21 @@ impl Market {
 		assert!(spend > 0);
 		assert!(price_per_share > 0 && price_per_share < 100);
 		assert_eq!(self.resoluted, false);
-		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price_per_share, amt_of_shares);
+		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price_per_share, 0);
 		let total_spend = spend - spend_filled;
-		// TODO: also set last price traded for matching outcomes on fill
-		if total_spend > 0 { self.last_price_for_outcomes.insert(outcome, price_per_share); }
-		let shares_filled = amt_of_shares - shares_filled;
+		self.liquidity += spend;
+		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend, shares_filled);
 	}
 
-	fn fill_matches(&mut self, outcome: u64, mut spend: u128, price_per_share: u128, mut shares_left_to_fill: u128) -> (u128, u128) {
+	fn fill_matches(&mut self, outcome: u64, mut spend: u128, price_per_share: u128, mut shares_filled: u128) -> (u128, u128) {
 		let market_price = self.get_market_price(outcome);
-		if price_per_share < market_price || spend == 0 { return (spend, shares_left_to_fill); }
+		let mut shares_to_fill = spend / market_price;
+		if price_per_share < market_price || spend < 100 { return (spend, shares_filled); }
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		let shares_fillable = self.get_min_shares_fillable(outcome);
-		let mut shares_to_fill = shares_left_to_fill;
+		self.last_price_for_outcomes.insert(outcome, market_price);
 
 		if shares_fillable < shares_to_fill {
 			shares_to_fill = shares_fillable;
@@ -84,11 +86,10 @@ impl Market {
 				orderbook.fill_market_order(shares_to_fill);
 			}
 		}
-
 		spend -= shares_to_fill * market_price;
-		shares_left_to_fill -= shares_to_fill;
+		shares_filled += shares_to_fill;
 		
-		return self.fill_matches(outcome, spend, price_per_share, shares_left_to_fill);
+		return self.fill_matches(outcome, spend, price_per_share, shares_filled);
 	}
 
 	pub fn get_min_shares_fillable(&self, outcome: u64) -> u128 {

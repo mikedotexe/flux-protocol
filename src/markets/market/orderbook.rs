@@ -41,7 +41,8 @@ impl Orderbook {
 		let mut new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price_per_share, filled, amt_of_shares_filled);
 		*self.spend_by_user.entry(from.to_string()).or_insert(0) += spend;
 
-		if filled >= spend {
+		let left_to_spend = spend - filled;
+		if left_to_spend < 100 {
 			self.filled_orders.insert(order_id, new_order);
 			return;
 		}
