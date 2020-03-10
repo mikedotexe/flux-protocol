@@ -5,7 +5,7 @@ fn test_payout() {
 	testing_env!(get_context(carol()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), 100010101001010);
 
 	contract.place_order(0, 0, 30000, 70);
 	contract.place_order(0, 3, 1000, 10); 

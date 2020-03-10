@@ -60,14 +60,15 @@ impl Markets {
 		return *self.fdai_balances.get(&from).unwrap();
 	}
 
-	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, end_time: u64) -> bool {
+	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> bool {
 		assert!(outcomes > 1);
 		assert!(outcomes == 2 || outcomes == outcome_tags.len() as u64);
 		assert!(outcomes < 20); // up for change
+		assert!(categories.len() < 6);
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
 		// TODO check if end_time hasn't happened yet
 		let from = env::predecessor_account_id();
-		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, end_time);
+		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, categories, end_time);
 		self.active_markets.insert(self.nonce, new_market);
 		self.nonce = self.nonce + 1;
 		return true;
@@ -242,6 +243,10 @@ mod tests {
 
 	fn empty_string() -> String {
 		return "".to_string();
+	}
+
+	fn categories () -> Vec<String> {
+		return vec![];
 	}
 
 	fn outcome_tags(number_of_outcomes: u64) -> Vec<String> {

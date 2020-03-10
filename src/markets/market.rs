@@ -22,6 +22,7 @@ pub struct Market {
 	pub creator: String,
 	pub outcomes: u64,
 	pub outcome_tags: Vec<String>,
+	pub categories: Vec<String>,
 	pub last_price_for_outcomes: HashMap<u64, u128>,
 	pub end_time: u64,
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
@@ -31,7 +32,7 @@ pub struct Market {
 }
 
 impl Market {
-	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, end_time: u64) -> Self {
+	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
 
 		for i in 0..outcomes {
@@ -45,6 +46,7 @@ impl Market {
 			creator: from,
 			outcomes,
 			outcome_tags,
+			categories,
 			last_price_for_outcomes: HashMap::new(),
 			end_time,
 			orderbooks: empty_orderbooks,
