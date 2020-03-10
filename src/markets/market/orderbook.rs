@@ -36,9 +36,9 @@ impl Orderbook {
 		return id;
 	}
 
-	pub fn place_order(&mut self, from: String, outcome: u64, spend: u128, amt_of_shares: u128, price_per_share: u128, filled: u128, amt_of_shares_filled: u128) {
+	pub fn place_order(&mut self, from: String, outcome: u64, spend: u128, amt_of_shares: u128, price_per_share: u128, filled: u128, shares_filled: u128) {
 		let order_id = self.new_order_id();
-		let mut new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price_per_share, filled, amt_of_shares_filled);
+		let mut new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price_per_share, filled, shares_filled);
 		*self.spend_by_user.entry(from.to_string()).or_insert(0) += spend;
 
 		let left_to_spend = spend - filled;
@@ -94,7 +94,7 @@ impl Orderbook {
 		let parent = order.parent;
 		let better_order_id = order.better_order_id;
 		let worse_order_id = order.worse_order_id;
-		if order.amt_of_shares_filled > 0 {
+		if order.shares_filled > 0 {
 			self.filled_orders.insert(order.id, order.clone());
 		}
 		
@@ -146,7 +146,7 @@ impl Orderbook {
 	// TODO: Should catch these rounding errors earlier, right now some "dust" will be lost.
 	pub fn fill_market_order(&mut self, mut amt_of_shares_to_fill: u128) {
 		let current_order = self.open_orders.get_mut(&self.market_order.unwrap()).unwrap();
-		current_order.amt_of_shares_filled += amt_of_shares_to_fill;
+		current_order.shares_filled += amt_of_shares_to_fill;
 		current_order.filled += amt_of_shares_to_fill * current_order.price_per_share;
 		if current_order.spend - current_order.filled < 100 { // some rounding erros here might cause some stack overflow bugs that's why this is build in.
 			self.remove_order(self.market_order.unwrap()); 
@@ -197,12 +197,12 @@ impl Orderbook {
 		let mut claimable = 0;
 		for (_, order) in self.open_orders.iter() {
 			if order.creator == from {
-				claimable += order.amt_of_shares_filled * 100;
+				claimable += order.shares_filled * 100;
 			}
 		}
 		for (_, order) in self.filled_orders.iter() {
 			if order.creator == from {
-				claimable += order.amt_of_shares_filled * 100;
+				claimable += order.shares_filled * 100;
 			}
 		}
 		return claimable;

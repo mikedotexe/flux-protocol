@@ -46,7 +46,7 @@ impl Markets {
 		let can_claim = self.fdai_balances.get(&from).is_none();
 		assert!(can_claim);
 		
-		let claim_amount = 1000 * self.dai_token();
+		let claim_amount = 100 * self.dai_token();
 		self.fdai_balances.insert(from, claim_amount);
 
 		// Monitoring total supply - just for testnet
@@ -166,6 +166,14 @@ impl Markets {
 
 	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> { 
 		return &self.active_markets;
+	}
+
+	pub fn get_specific_markets(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> { 
+		let mut markets = BTreeMap::new();
+		for market_id in 0..market_ids.len() {
+			markets.insert(market_id as u64, self.active_markets.get(&(market_id as u64)).unwrap());
+		}
+		return markets;
 	}
 
 	pub fn get_market(&self, id: u64) -> &Market {
