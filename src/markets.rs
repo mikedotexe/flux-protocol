@@ -44,7 +44,7 @@ impl Markets {
 	pub fn claim_fdai(&mut self) -> bool{
 		let from = env::predecessor_account_id();
 		let can_claim = self.fdai_balances.get(&from).is_none();
-		assert!(can_claim);
+		assert!(can_claim, "user has already claimed fdai");
 		
 		let claim_amount = 100 * self.dai_token();
 		self.fdai_balances.insert(from, claim_amount);
@@ -60,7 +60,7 @@ impl Markets {
 		return *self.fdai_balances.get(&from).unwrap();
 	}
 
-	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> bool {
+	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> u64 {
 		assert!(outcomes > 1);
 		assert!(outcomes == 2 || outcomes == outcome_tags.len() as u64);
 		assert!(outcomes < 20); // up for change
@@ -69,20 +69,16 @@ impl Markets {
 		// TODO check if end_time hasn't happened yet
 		let from = env::predecessor_account_id();
 		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, categories, end_time);
+		let market_id = new_market.id;
 		self.active_markets.insert(self.nonce, new_market);
 		self.nonce = self.nonce + 1;
-		return true;
+		return market_id;
 	}
 
-	pub fn delete_market(&mut self, market_id: u64) -> bool {
+	pub fn delete_market(&mut self, market_id: u64) {
 		let from = env::predecessor_account_id();
-
-		if  from == self.creator {
-			self.active_markets.remove(&market_id);
-			return true;
-		} else {
-			return false;
-		}
+		assert_eq!(from, self.creator, "markets can only be deleted by the market creator");
+		self.active_markets.remove(&market_id);
 	}
 
 	pub fn place_order(&mut self, market_id: u64, outcome: u64, spend: u128, price_per_share: u128) {

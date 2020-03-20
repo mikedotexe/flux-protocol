@@ -136,7 +136,6 @@ impl Market {
 				market_price -= market_order.price_per_share;
 			}
 		}
-
 		return market_price;
 	}
 
