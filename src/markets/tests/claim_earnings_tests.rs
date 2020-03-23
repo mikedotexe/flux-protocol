@@ -34,9 +34,9 @@ fn test_payout() {
 	// println!("initially claimable: {}", initially_claimable_alice);
 	// println!("initial fdai balance: {}", initial_balance_alice);
 	// println!("");
-	contract.claim_earnings(0);
+	contract.claim_earnings(0, carol());
 	testing_env!(get_context(alice()));
-	contract.claim_earnings(0);
+	contract.claim_earnings(0, alice());
 	
 	let claimable_after_claim_carol = contract.get_claimable(0, carol());
 	let claimable_after_claim_alice = contract.get_claimable(0, alice());
