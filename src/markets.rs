@@ -165,6 +165,14 @@ impl Markets {
 		return &self.active_markets;
 	}
 
+	pub fn get_markets_by_id(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> { 
+		let mut markets = BTreeMap::new();
+		for market_id in market_ids {
+			markets.insert(market_id, self.active_markets.get(&market_id).unwrap());
+		}
+		return markets;
+	}
+
 	pub fn get_specific_markets(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> { 
 		let mut markets = BTreeMap::new();
 		for market_id in 0..market_ids.len() {
