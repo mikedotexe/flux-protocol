@@ -150,13 +150,12 @@ impl Markets {
 		return self.active_markets.get(&market_id).unwrap().get_claimable(from);	
 	}
 
-	pub fn claim_earnings(&mut self, market_id: u64) {
-		let from = env::predecessor_account_id();
+	pub fn claim_earnings(&mut self, market_id: u64, accountId: String) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, true);
 		
-		let claimable = market.get_claimable(from.to_string());	
-		market.delete_orders_for(from.to_string());
+		let claimable = market.get_claimable(accountId.to_string());	
+		market.delete_orders_for(accountId.to_string());
 
 		self.add_balance(claimable);
 	}

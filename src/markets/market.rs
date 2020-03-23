@@ -24,6 +24,7 @@ pub struct Market {
 	pub outcome_tags: Vec<String>,
 	pub categories: Vec<String>,
 	pub last_price_for_outcomes: HashMap<u64, u128>,
+	// creation_time: u128
 	pub end_time: u64,
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub winning_outcome: Option<u64>,
@@ -34,6 +35,7 @@ pub struct Market {
 impl Market {
 	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
+		// TODO get blocktime at creation
 
 		for i in 0..outcomes {
 			empty_orderbooks.insert(i, Orderbook::new(i));
