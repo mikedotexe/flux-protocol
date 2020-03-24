@@ -1,4 +1,5 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap};
+use std::cmp;
 use std::panic;
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_bindgen::{near_bindgen};
@@ -12,8 +13,8 @@ pub type Order = order::Order;
 pub struct Orderbook {
 	pub root: Option<u128>,
 	pub market_order: Option<u128>,
-	pub open_orders: BTreeMap<u128, Order>,
-	pub filled_orders: BTreeMap<u128, Order>,
+	pub open_orders: BTreeMap<u128, Vec<Order>>,
+	pub filled_orders: BTreeMap<u128, Vec<Order>>,
 	pub spend_by_user: BTreeMap<String, u128>,
 	pub nonce: u128,
 	pub outcome_id: u64
@@ -32,220 +33,158 @@ impl Orderbook {
 		}
 	}
 
+    // Grabs latest nonce
 	fn new_order_id(&mut self) -> u128 {
 		let id = self.nonce;
 		self.nonce = self.nonce + 1;
 		return id;
 	}
 
+    // Places order in orderbook
 	pub fn place_order(&mut self, from: String, outcome: u64, spend: u128, amt_of_shares: u128, price_per_share: u128, filled: u128, amt_of_shares_filled: u128) {
 		let order_id = self.new_order_id();
 		let mut new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price_per_share, filled, amt_of_shares_filled);
 		*self.spend_by_user.entry(from.to_string()).or_insert(0) += spend;
 
+        // If all of spend is filled, state order is fully filled
 		if filled >= spend {
-			self.filled_orders.insert(order_id, new_order);
+			let entry = *self.filled_orders.entry(price_per_share).or_insert(Vec::new());
+			entry.push(new_order);
 			return;
 		}
 
-		self.set_market_order(order_id, price_per_share);
+        // If there is a remaining order, set this new order as the new market rate
+		self.set_market_order(price_per_share);
 
-		if self.root.is_none() {
-			self.root = Some(new_order.clone().id);
-		} else {
-			new_order = self.find_and_add_parent(new_order.clone());
-		}
-
-		self.open_orders.insert(order_id, new_order);
+        // Insert order into order map
+		let entry = *self.open_orders.entry(price_per_share).or_insert(Vec::new());
+		entry.push(new_order);
 	}
 
-	fn set_market_order(&mut self, order_id: u128, price_per_share: u128) {
-		let current_market_order_id = self.market_order;
-		if current_market_order_id.is_none() {
-			self.market_order = Some(order_id);
+    // Updates current market order price
+	fn set_market_order(&mut self, price_per_share: u128) {
+		let current_market_order_price = self.market_order;
+		if current_market_order_price.is_none() {
+			self.market_order = Some(price_per_share);
 		} else {
-			let current_market_order = self.open_orders.get(&current_market_order_id.unwrap()).unwrap();
-			if current_market_order.price_per_share < price_per_share {
-				self.market_order = Some(order_id);
+			let Some((current_market_price, current_market_order)) = self.open_orders.first_key_value();
+			if *current_market_price < price_per_share {
+				self.market_order = Some(price_per_share);
 			}
-		}
-	}
-
-	fn remove_market_order(&mut self) {
-		let market_order = self.open_orders.get(&self.market_order.unwrap()).unwrap();
-		if market_order.better_order_id.is_none() {
-			if market_order.worse_order_id.is_none() {
-				if market_order.parent.is_none() {
-					self.market_order = None;
-				} else {
-					self.market_order = market_order.parent;
-				}
-			} else {
-				self.market_order = market_order.worse_order_id;
-			}
-		} else {
-			self.market_order = market_order.better_order_id;
 		}
 	}
 
-	pub fn remove_order(&mut self, order_id: u128) -> u128 {
-		let order = self.open_orders.get_mut(&order_id).unwrap();
-		let outstanding_spend = order.spend - order.filled;
-		*self.spend_by_user.get_mut(&order.creator).unwrap() -= outstanding_spend;
-		let parent = order.parent;
-		let better_order_id = order.better_order_id;
-		let worse_order_id = order.worse_order_id;
-		if order.amt_of_shares_filled > 0 {
-			self.filled_orders.insert(order.id, order.clone());
-		}
-		
-		if (Some(order_id) == self.market_order) {
-			self.remove_market_order();
-		}
-		// If removed order is root
-		if parent.is_none() {
-			
-			self.root = better_order_id;
-			
-			if !better_order_id.is_none() {
-				let better_order = self.open_orders.get_mut(&better_order_id.unwrap()).unwrap();
-				better_order.parent = None;
-				if !worse_order_id.is_none() {
-					self.update_and_replace_order(worse_order_id);
-				}
-			} else if !worse_order_id.is_none() {
-				self.root = worse_order_id;
-				let worse_order = self.open_orders.get_mut(&worse_order_id.unwrap()).unwrap();
-				worse_order.parent = None;
-			}
-		} 
-		else {
-			let parent = self.open_orders.get_mut(&parent.unwrap()).unwrap();
-			if parent.better_order_id == Some(order_id) {
-				parent.better_order_id = better_order_id;
-				self.update_and_replace_order(worse_order_id);
-			} else if parent.worse_order_id == Some(order_id) {
-				parent.worse_order_id = worse_order_id;
-				self.update_and_replace_order(better_order_id);
-			}
-		}
-		
-		
-		self.open_orders.remove(&order_id);
+    // Remove order from orderbook -- added price_per_share - might be a problem at markets/market level, also if invalid order id passed behaviour undefined
+	pub fn remove_order(&mut self, order_id: u128, price_per_share: u128) -> u128 {
+		// Get orders at price
+		let order_vec = self.open_orders.get_mut(&price_per_share).unwrap();
+        let outstanding_spend;
+
+        for i in 0..order_vec.len() {
+            if order_vec[i].id == order_id {
+                outstanding_spend = order_vec[i].spend - order_vec[i].filled;
+                *self.spend_by_user.get_mut(&order_vec[i].creator).unwrap() -= outstanding_spend;
+
+                if order_vec[i].amt_of_shares_filled > 0 {
+                    let entry = *self.filled_orders.entry(price_per_share).or_insert(Vec::new());
+                	entry.push(order_vec[i].clone());
+                }
+
+                order_vec.swap_remove(i);
+                if order_vec.is_empty() {
+                    self.open_orders.remove(&price_per_share);
+                    let Some((min_key, min_value)) = self.open_orders.first_key_value();
+                    self.market_order = Some(*min_key);
+                }
+                break;
+            }
+        }
 		return outstanding_spend;
 	}
 
-	fn update_and_replace_order(&mut self, order_id: Option<u128>) {
-		if !order_id.is_none() {
-			let order = self.open_orders.get_mut(&order_id.unwrap()).unwrap().to_owned();
-			let updated_order = self.find_and_add_parent(order);
-			self.open_orders.insert(updated_order.id, updated_order);
-		}
-
-	}
-	
 	// TODO: Should catch these rounding errors earlier, right now some "dust" will be lost.
 	pub fn fill_market_order(&mut self, mut amt_of_shares_to_fill: u128) {
-		let current_order = self.open_orders.get_mut(&self.market_order.unwrap()).unwrap();
-		current_order.amt_of_shares_filled += amt_of_shares_to_fill;
-		current_order.filled += amt_of_shares_to_fill * current_order.price_per_share;
-		if current_order.spend - current_order.filled < 100 { // some rounding erros here might cause some stack overflow bugs that's why this is build in.
-			self.remove_order(self.market_order.unwrap()); 
-		}
-	}
+		let Some((current_order_key, current_order_vec)) = self.open_orders.first_key_value();
+		// Iteratively fill market orders until done
+		for i in 0..current_order_vec.len() {
+		    if amt_of_shares_to_fill > 0 {
+                let shares_remaining_in_order = current_order_vec[i].amt_of_shares - current_order_vec[i].amt_of_shares_filled;
+                let filling = cmp::min(shares_remaining_in_order, amt_of_shares_to_fill);
 
+                current_order_vec[i].amt_of_shares_filled += filling;
+                current_order_vec[i].filled += filling * current_order_vec[i].price_per_share;
 
-	fn find_and_add_parent(&mut self, new_order: Order) -> Order {
-		let mut order_id_optional = self.root;
-		let mut parent_order = None;
-		let mut updated_order = new_order.clone();
-		
-		while parent_order.is_none() {
-			let order = self.open_orders.get(&order_id_optional.unwrap()).unwrap();
-			if order.is_better_price_than(new_order.clone()) {
-				if !order.worse_order_id.is_none() {
-					order_id_optional = order.worse_order_id;
-				} else {
-					parent_order = Some(order);
-					updated_order.parent = Some(order.id);
-				}
-			} else {
-				if !order.better_order_id.is_none() {
-					order_id_optional = order.better_order_id;
-				} else {
-					parent_order = Some(order);
-					updated_order.parent = Some(order.id);
-				}
-			}
+                if current_order_vec[i].spend - current_order_vec[i].filled < 100 { // some rounding erros here might cause some stack overflow bugs that's why this is build in.
+                    self.remove_order(current_order_vec[i].id, current_order_vec[i].price_per_share);
+                }
 
-		}
-		
-		self.add_child(parent_order.unwrap().id, updated_order.clone());
-		return updated_order;
-	}
-
-	fn add_child(&mut self, parent_id: u128, child: Order) {
-		let parent_order = self.open_orders.get_mut(&parent_id).unwrap();
-	
-		if parent_order.is_better_price_than(child.to_owned()) {
-			parent_order.worse_order_id = Some(child.id);
-		} else {
-			parent_order.better_order_id = Some(child.id)
+                amt_of_shares_to_fill -= filling;
+		    } else {
+		        break
+		    }
 		}
 	}
 
 	pub fn calc_claimable_amt(&self, from: String) -> u128 {
 		let mut claimable = 0;
-		for (_, order) in self.open_orders.iter() {
-			if order.creator == from {
-				claimable += order.amt_of_shares_filled * 100;
-			}
+		for (_, order_vec) in self.open_orders.iter() {
+		    for i in 0..order_vec.len() {
+		        if order_vec[i].creator == from {
+                    claimable += order_vec[i].amt_of_shares_filled * 100;
+                }
+		    }
 		}
-		for (_, order) in self.filled_orders.iter() {
-			if order.creator == from {
-				claimable += order.amt_of_shares_filled * 100;
-			}
+		for (_, order_vec) in self.filled_orders.iter() {
+		    for i in 0..order_vec.len() {
+		        if order_vec[i].creator == from {
+                    claimable += order_vec[i].amt_of_shares_filled * 100;
+                }
+		    }
 		}
 		return claimable;
 	}
 
 	pub fn delete_orders_for(&mut self, from: String) {
-		let mut open_orders_to_delete = vec![];
-		let mut filled_orders_to_delete = vec![];
+		for (_, order_vec) in &mut self.open_orders {
+		    for i in 0..order_vec.len() {
+                if order_vec[i].creator == from {
+                    self.remove_order(order_vec[i].id, order_vec[i].price_per_share);
+                }
+            }
+		}
 
-		for (_, order) in &mut self.open_orders {
-			if order.creator == from {
-				open_orders_to_delete.push(order.id);
+		for (_, order_vec) in &mut self.filled_orders {
+		    for i in 0..order_vec.len() {
+			    if order_vec[i].creator == from {
+				    self.remove_filled_order(order_vec[i].id, order_vec[i].price_per_share);
+			    }
 			}
 		}
-
-		for (_, order) in &mut self.filled_orders {
-			if order.creator == from {
-				filled_orders_to_delete.push(order.id);
-			}
-		}
-
-		self.delete_open_orders(open_orders_to_delete);
-		self.delete_filled_orders(filled_orders_to_delete);
 	}
 
-	fn delete_filled_orders(&mut self, order_ids: Vec<u128>) {
-		for order_id in order_ids {
-			self.filled_orders.remove(&order_id);
-		}
-	}
-	fn delete_open_orders(&mut self, order_ids: Vec<u128>) {
-		for order_id in order_ids {
-			self.open_orders.remove(&order_id);
-		}
-	}
+    fn remove_filled_order(self, order_id : u128, price_per_share : u128) {
+        // Get filled orders at price
+        let filled_order_vec = self.filled_orders.get_mut(&price_per_share).unwrap();
+        for i in 0..filled_order_vec.len() {
+            if filled_order_vec[i].id == order_id {
+                filled_order_vec.swap_remove(i);
+                if filled_order_vec.is_empty() {
+                    self.filled_orders.remove(&price_per_share);
+                }
+                return;
+            }
+        }
+        return;
+    }
 
 	pub fn get_open_order_value_for(&self, from: String) -> u128 {
 		let mut claimable = 0;
-		for (_, order) in self.open_orders.iter() {
-			if order.creator == from {
-				claimable += order.spend - order.filled;
-			}
+		for (_, order_vec) in self.open_orders.iter() {
+		    for i in 0..order_vec.len() {
+		        if order_vec[i].creator == from {
+                    claimable += order_vec[i].spend - order_vec[i].filled;
+                }
+		    }
 		}
 		return claimable;
 	}
