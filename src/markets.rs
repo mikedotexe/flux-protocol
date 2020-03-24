@@ -102,10 +102,18 @@ impl Markets {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, false);
 		let orderbook = market.orderbooks.get_mut(&outcome).unwrap();
-		let order = orderbook.open_orders.get(&order_id).unwrap();
-		assert_eq!(order.creator, from);
-		let outstanding_spend = orderbook.remove_order(order_id);
-		self.add_balance(outstanding_spend)
+
+		// TODO: There has to be faster way to do this..
+		for (_, order_vec) in orderbook.open_orders.iter() {
+            for i in 0..order_vec.len() {
+                if order_vec[i].id == order_id {
+                    assert_eq!(order_vec[i].creator, from);
+                    let outstanding_spend = orderbook.remove_order(order_id, order_vec[i].price_per_share);
+                    self.add_balance(outstanding_spend);
+                    return
+                }
+            }
+        }
 	}
 
 	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
@@ -136,13 +144,13 @@ impl Markets {
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
 	}
 
-	pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, Order> {
+	pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, Vec<Order>> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 		return &orderbook.open_orders;
 	}
 	
-	pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, Order> {
+	pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, Vec<Order>> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 		return &orderbook.filled_orders;

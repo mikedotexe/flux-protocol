@@ -93,16 +93,20 @@ impl Market {
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
-			let market_order_optional = orderbook.market_order;
+			let market_order_optional = orderbook.market_order.unwrap();
 
-			if !market_order_optional.is_none() {
-				let market_order = orderbook.open_orders.get(&market_order_optional.unwrap()).unwrap();
-				let left_to_fill = market_order.spend - market_order.filled;
-				let shares_to_fill = left_to_fill  / market_order.price_per_share;
-				if shares.is_none() || shares_to_fill < shares.unwrap() {
-					shares = Some(shares_to_fill);
-				}
-			} 
+            let Some((market_order_price_per_share, market_order_vec)) = orderbook.open_orders.first_key_value();
+            let left_to_fill;
+            let shares_to_fill;
+            if !market_order_vec.is_empty() {
+                for i in 0..market_order_vec.len() {
+                    left_to_fill += market_order_vec[i].spend - market_order_vec[i].filled;
+                    shares_to_fill += left_to_fill / market_order_price_per_share;
+                }
+                if shares.is_none() || shares_to_fill < shares.unwrap() {
+                    shares = Some(shares_to_fill);
+                }
+            }
 		}
 
 		return shares.unwrap();
@@ -123,11 +127,10 @@ impl Market {
 
  		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
-			let market_order_optional = orderbook.market_order;
+			let market_order_price_per_share = orderbook.market_order;
 
-			if !market_order_optional.is_none() {
-				let market_order = orderbook.open_orders.get(&market_order_optional.unwrap()).unwrap();
-				market_price -= market_order.price_per_share;
+			if !market_order_price_per_share.is_none() {
+				market_price -= market_order_price_per_share.unwrap();
 			}
 		}
 
