@@ -5,7 +5,7 @@ fn test_payout() {
 	testing_env!(get_context(carol()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), 100010101001010);
 
 	contract.place_order(0, 0, 30000, 70);
 	contract.place_order(0, 3, 1000, 10); 
@@ -34,9 +34,9 @@ fn test_payout() {
 	// println!("initially claimable: {}", initially_claimable_alice);
 	// println!("initial fdai balance: {}", initial_balance_alice);
 	// println!("");
-	contract.claim_earnings(0);
+	contract.claim_earnings(0, carol());
 	testing_env!(get_context(alice()));
-	contract.claim_earnings(0);
+	contract.claim_earnings(0, alice());
 	
 	let claimable_after_claim_carol = contract.get_claimable(0, carol());
 	let claimable_after_claim_alice = contract.get_claimable(0, alice());

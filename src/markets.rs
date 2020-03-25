@@ -44,7 +44,7 @@ impl Markets {
 	pub fn claim_fdai(&mut self) -> bool{
 		let from = env::predecessor_account_id();
 		let can_claim = self.fdai_balances.get(&from).is_none();
-		assert!(can_claim);
+		assert!(can_claim, "user has already claimed fdai");
 		
 		let claim_amount = 100 * self.dai_token();
 		self.fdai_balances.insert(from, claim_amount);
@@ -60,28 +60,25 @@ impl Markets {
 		return *self.fdai_balances.get(&from).unwrap();
 	}
 
-	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, end_time: u64) -> bool {
+	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> u64 {
 		assert!(outcomes > 1);
 		assert!(outcomes == 2 || outcomes == outcome_tags.len() as u64);
 		assert!(outcomes < 20); // up for change
+		assert!(categories.len() < 6);
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
 		// TODO check if end_time hasn't happened yet
 		let from = env::predecessor_account_id();
-		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, end_time);
+		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, categories, end_time);
+		let market_id = new_market.id;
 		self.active_markets.insert(self.nonce, new_market);
 		self.nonce = self.nonce + 1;
-		return true;
+		return market_id;
 	}
 
-	pub fn delete_market(&mut self, market_id: u64) -> bool {
+	pub fn delete_market(&mut self, market_id: u64) {
 		let from = env::predecessor_account_id();
-
-		if  from == self.creator {
-			self.active_markets.remove(&market_id);
-			return true;
-		} else {
-			return false;
-		}
+		assert_eq!(from, self.creator, "markets can only be deleted by the market creator");
+		self.active_markets.remove(&market_id);
 	}
 
 	pub fn place_order(&mut self, market_id: u64, outcome: u64, spend: u128, price_per_share: u128) {
@@ -103,17 +100,18 @@ impl Markets {
 		assert_eq!(market.resoluted, false);
 		let orderbook = market.orderbooks.get_mut(&outcome).unwrap();
 
-        let orders_by_user_vec = orderbook.orders_by_user.get_mut(&from).unwrap();
-        for i in 0..orders_by_user_vec.len() {
-            // v = [outcome, price, order_id]
-            let v: Vec<&str> = orders_by_user_vec[i].rsplit("::").collect();
-            if v[2].parse::<u128>().unwrap() == order_id {
-                let outstanding_spend = orderbook.remove_order(order_id, v[1].parse::<u128>().unwrap());
-                self.add_balance(outstanding_spend);
-                return;
-            }
+    let orders_by_user_vec = orderbook.orders_by_user.get_mut(&from).unwrap();
+    for i in 0..orders_by_user_vec.len() {
+        // v = [outcome, price, order_id]
+        let v: Vec<&str> = orders_by_user_vec[i].rsplit("::").collect();
+        if v[2].parse::<u128>().unwrap() == order_id {
+            let outstanding_spend = orderbook.remove_order(order_id, v[1].parse::<u128>().unwrap());
+            market.liquidity -= outstanding_spend;
+            self.add_balance(outstanding_spend);
+            return;
         }
-        return;
+    }
+    return;
 	}
 
 	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
@@ -160,19 +158,34 @@ impl Markets {
 		return self.active_markets.get(&market_id).unwrap().get_claimable(from);	
 	}
 
-	pub fn claim_earnings(&mut self, market_id: u64) {
-		let from = env::predecessor_account_id();
+	pub fn claim_earnings(&mut self, market_id: u64, accountId: String) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, true);
 		
-		let claimable = market.get_claimable(from.to_string());	
-		market.delete_orders_for(from);
+		let claimable = market.get_claimable(accountId.to_string());	
+		market.delete_orders_for(accountId.to_string());
 
 		self.add_balance(claimable);
 	}
 
 	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> { 
 		return &self.active_markets;
+	}
+
+	pub fn get_markets_by_id(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> { 
+		let mut markets = BTreeMap::new();
+		for market_id in market_ids {
+			markets.insert(market_id, self.active_markets.get(&market_id).unwrap());
+		}
+		return markets;
+	}
+
+	pub fn get_specific_markets(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> { 
+		let mut markets = BTreeMap::new();
+		for market_id in 0..market_ids.len() {
+			markets.insert(market_id as u64, self.active_markets.get(&(market_id as u64)).unwrap());
+		}
+		return markets;
 	}
 
 	pub fn get_market(&self, id: u64) -> &Market {
@@ -193,7 +206,6 @@ impl Markets {
 		let market = self.active_markets.get(&market_id).unwrap();
 		return market.get_market_price(outcome);
 	}
-
 
 	pub fn get_market_prices(&self, market_id: u64) -> BTreeMap<u64, u128> {
 		let market = self.active_markets.get(&market_id).unwrap();
@@ -242,6 +254,10 @@ mod tests {
 
 	fn empty_string() -> String {
 		return "".to_string();
+	}
+
+	fn categories () -> Vec<String> {
+		return vec![];
 	}
 
 	fn outcome_tags(number_of_outcomes: u64) -> Vec<String> {

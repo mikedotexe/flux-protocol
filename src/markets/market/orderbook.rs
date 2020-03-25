@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap};
 use std::cmp;
-use std::panic;
 use borsh::{BorshDeserialize, BorshSerialize};
 use near_bindgen::{near_bindgen};
 use serde::{Deserialize, Serialize};
@@ -21,7 +20,6 @@ pub struct Orderbook {
 	pub nonce: u128,
 	pub outcome_id: u64
 }
-// TODO: Market orders are broken - don't update correctly
 impl Orderbook {
 	pub fn new(outcome: u64) -> Self {
 		Self {
@@ -44,13 +42,14 @@ impl Orderbook {
 	}
 
     // Places order in orderbook
-	pub fn place_order(&mut self, from: String, outcome: u64, spend: u128, amt_of_shares: u128, price_per_share: u128, filled: u128, amt_of_shares_filled: u128) {
+	pub fn place_order(&mut self, from: String, outcome: u64, spend: u128, amt_of_shares: u128, price_per_share: u128, filled: u128, shares_filled: u128) {
 		let order_id = self.new_order_id();
-		let mut new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price_per_share, filled, amt_of_shares_filled);
+		let mut new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price_per_share, filled, shares_filled);
 		*self.spend_by_user.entry(from.to_string()).or_insert(0) += spend;
 
-        // If all of spend is filled, state order is fully filled
-		if filled >= spend {
+    // If all of spend is filled, state order is fully filled
+    let left_to_spend = spend - filled;
+		if left_to_spend < 100 {
 			let entry = *self.filled_orders.entry(price_per_share).or_insert(BTreeMap::new());
 			entry.insert(order_id, new_order);
 			return;
@@ -187,6 +186,11 @@ impl Orderbook {
         }
         return;
     }
+
+	pub fn get_market_order_price(&self) -> u128 {
+		let market_order = self.open_orders.get(&self.market_order.unwrap()).unwrap();
+		return market_order.price_per_share;
+	}
 
 	pub fn get_open_order_value_for(&self, from: String) -> u128 {
 		let mut claimable = 0;
