@@ -103,17 +103,17 @@ impl Markets {
 		assert_eq!(market.resoluted, false);
 		let orderbook = market.orderbooks.get_mut(&outcome).unwrap();
 
-		// TODO: There has to be faster way to do this..
-		for (_, order_vec) in orderbook.open_orders.iter() {
-            for i in 0..order_vec.len() {
-                if order_vec[i].id == order_id {
-                    assert_eq!(order_vec[i].creator, from);
-                    let outstanding_spend = orderbook.remove_order(order_id, order_vec[i].price_per_share);
-                    self.add_balance(outstanding_spend);
-                    return
-                }
+        let orders_by_user_vec = orderbook.orders_by_user.get_mut(&from).unwrap();
+        for i in 0..orders_by_user_vec.len() {
+            // v = [outcome, price, order_id]
+            let v: Vec<&str> = orders_by_user_vec[i].rsplit("::").collect();
+            if v[2].parse::<u128>().unwrap() == order_id {
+                let outstanding_spend = orderbook.remove_order(order_id, v[1].parse::<u128>().unwrap());
+                self.add_balance(outstanding_spend);
+                return;
             }
         }
+        return;
 	}
 
 	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
@@ -144,13 +144,13 @@ impl Markets {
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
 	}
 
-	pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, Vec<Order>> {
+	pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, BTreeMap<u128, Order>> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 		return &orderbook.open_orders;
 	}
 	
-	pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, Vec<Order>> {
+	pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, BTreeMap<u128, Order>> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 		return &orderbook.filled_orders;
