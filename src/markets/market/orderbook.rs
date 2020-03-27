@@ -88,7 +88,7 @@ impl Orderbook {
             *self.spend_by_user.get_mut(&order.creator).unwrap() -= outstanding_spend;
 
             // Add back to filled if eligible, remove from user map if not
-            if order.amt_of_shares_filled > 0 {
+            if order.shares_filled > 0 {
                 self.filled_orders.entry(price_per_share).or_insert(BTreeMap::new()).insert(order.id, order.clone());
             } else {
                 let order_by_user_vec = self.orders_by_user.get_mut(&order.creator).unwrap();
@@ -121,10 +121,10 @@ impl Orderbook {
 		    // Iteratively fill market orders until done
             for (order_id, order) in current_order_map.iter_mut() {
                 if amt_of_shares_to_fill > 0 {
-                    let shares_remaining_in_order = order.amt_of_shares - order.amt_of_shares_filled;
+                    let shares_remaining_in_order = order.amt_of_shares - order.shares_filled;
                     let filling = cmp::min(shares_remaining_in_order, amt_of_shares_to_fill);
 
-                    order.amt_of_shares_filled += filling;
+                    order.shares_filled += filling;
                     order.filled += filling * order.price_per_share;
 
                     if order.spend - order.filled < 100 { // some rounding errors here might cause some stack overflow bugs that's why this is build in.
@@ -153,12 +153,12 @@ impl Orderbook {
 		    // Try open orders
 		    let open_order_map = self.open_orders.get(&v[1].parse::<u128>().unwrap()).unwrap();
 		    let order = open_order_map.get(&v[2].parse::<u128>().unwrap()).unwrap();
-		    claimable += order.amt_of_shares_filled * 100;
+		    claimable += order.shares_filled * 100;
 
 		    // Try filled orders
 		    let filled_order_map = self.filled_orders.get(&v[1].parse::<u128>().unwrap()).unwrap();
 		    let filled_order = filled_order_map.get(&v[2].parse::<u128>().unwrap()).unwrap();
-		    claimable += filled_order.amt_of_shares_filled * 100;
+		    claimable += filled_order.shares_filled * 100;
 		}
 		return claimable;
 	}
@@ -199,8 +199,7 @@ impl Orderbook {
     }
 
 	pub fn get_market_order_price(&self) -> u128 {
-		let market_order = self.open_orders.get(&self.market_order.unwrap()).unwrap();
-		return market_order.price_per_share;
+		return self.market_order.unwrap();
 	}
 
 	pub fn get_open_order_value_for(&self, from: String) -> u128 {
@@ -213,7 +212,7 @@ impl Orderbook {
             // Try open orders
             let open_order_map = self.open_orders.get(&v[1].parse::<u128>().unwrap()).unwrap();
             let order = open_order_map.get(&v[2].parse::<u128>().unwrap()).unwrap();
-            claimable += order.amt_of_shares_filled * 100;
+            claimable += order.shares_filled * 100;
         }
 		return claimable;
 	}

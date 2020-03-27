@@ -112,8 +112,6 @@ impl Markets {
             }
         }
     }
-    return;
-	}
 
 	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
 		let from = env::predecessor_account_id();
