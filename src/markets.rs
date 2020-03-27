@@ -101,9 +101,9 @@ impl Markets {
 		let from = env::predecessor_account_id();
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, false);
-		let orderbook = market.orderbooks.get_mut(&outcome).unwrap();
+		let mut orderbook = market.orderbooks.get_mut(&outcome).unwrap();
 
-        let orders_by_user_vec = orderbook.orders_by_user.get_mut(&from).unwrap();
+        let orders_by_user_vec = orderbook.orders_by_user.get(&from).unwrap();
         for i in 0..orders_by_user_vec.len() {
             // v = [outcome, price, order_id]
             let v: Vec<&str> = orders_by_user_vec[i].rsplit("::").collect();
@@ -157,7 +157,7 @@ impl Markets {
 	}
 
 	pub fn get_claimable(&self, market_id: u64, from: String) -> u128 {
-		return self.active_markets.get(&market_id).unwrap().get_claimable(from);	
+		return self.active_markets.get(&market_id).unwrap().get_claimable(from);
 	}
 
 	pub fn claim_earnings(&mut self, market_id: u64) {
@@ -184,16 +184,10 @@ impl Markets {
 		return self.creator.to_string();
 	}
 
-	pub fn get_market_order(&self, market_id: u64, outcome: u64)  -> Option<u128> {
-		let market = self.active_markets.get(&market_id).unwrap();
-		return market.orderbooks[&outcome].market_order;
-	}
-
 	pub fn get_market_price(&self, market_id: u64, outcome: u64) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
 		return market.get_market_price(outcome);
 	}
-
 
 	pub fn get_market_prices(&self, market_id: u64) -> BTreeMap<u64, u128> {
 		let market = self.active_markets.get(&market_id).unwrap();
@@ -274,7 +268,6 @@ mod tests {
 	}
 
 	mod init_tests;
-	mod bst_tests;
 	mod market_order_tests;
 	mod binary_order_matching_tests;
 	mod categorical_market_tests;

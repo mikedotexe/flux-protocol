@@ -93,13 +93,11 @@ impl Market {
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
-			let market_order_optional = orderbook.market_order.unwrap();
 
-            let Some((market_order_price_per_share, market_order_map)) = orderbook.open_orders.first_key_value();
-            let left_to_fill;
-            let shares_to_fill;
-            if !market_order_map.is_empty() {
-                for (key, order) in market_order_map.iter() {
+            if let Some((market_order_price_per_share, market_order_map)) = orderbook.open_orders.iter().next() {
+                let mut left_to_fill = 0;
+                let mut shares_to_fill = 0;
+                for (_, order) in market_order_map.iter() {
                     left_to_fill += order.spend - order.filled;
                     shares_to_fill += left_to_fill / market_order_price_per_share;
                 }
@@ -164,11 +162,11 @@ impl Market {
 		let mut claimable = 0;
 
 		if invalid {
-			for (key, orderbook) in self.orderbooks.iter() {
+			for (_, orderbook) in self.orderbooks.iter() {
 				claimable += orderbook.get_spend_by(from.to_string());
 			}
 		} else {
-			for (key, orderbook) in self.orderbooks.iter() {
+			for (_, orderbook) in self.orderbooks.iter() {
 				claimable += orderbook.get_open_order_value_for(from.to_string());
 			}
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
