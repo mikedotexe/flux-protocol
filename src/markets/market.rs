@@ -11,6 +11,8 @@ type Order = orderbook::Order;
 
 // TODO: Endtime has to be in blocks instead of ms / s
 // TODO: Add resolution_url
+// TODO: When filling an order for a price > market price the tx fails
+// TODO: Share denomination seems off by 1 decimal - don't know if frontend or backend fix
 #[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Market {
@@ -20,7 +22,9 @@ pub struct Market {
 	pub creator: String,
 	pub outcomes: u64,
 	pub outcome_tags: Vec<String>,
+	pub categories: Vec<String>,
 	pub last_price_for_outcomes: HashMap<u64, u128>,
+	// creation_time: u128
 	pub end_time: u64,
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub winning_outcome: Option<u64>,
@@ -29,8 +33,9 @@ pub struct Market {
 }
 
 impl Market {
-	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, end_time: u64) -> Self {
+	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
+		// TODO get blocktime at creation
 
 		for i in 0..outcomes {
 			empty_orderbooks.insert(i, Orderbook::new(i));
@@ -43,6 +48,7 @@ impl Market {
 			creator: from,
 			outcomes,
 			outcome_tags,
+			categories,
 			last_price_for_outcomes: HashMap::new(),
 			end_time,
 			orderbooks: empty_orderbooks,
@@ -56,20 +62,21 @@ impl Market {
 		assert!(spend > 0);
 		assert!(price_per_share > 0 && price_per_share < 100);
 		assert_eq!(self.resoluted, false);
-		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price_per_share, amt_of_shares);
+		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price_per_share, 0);
 		let total_spend = spend - spend_filled;
-		if total_spend > 0 { self.last_price_for_outcomes.insert(outcome, price_per_share); }
-		let shares_filled = amt_of_shares - shares_filled;
+		self.liquidity += spend;
+		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend, shares_filled);
 	}
 
-	fn fill_matches(&mut self, outcome: u64, mut spend: u128, price_per_share: u128, mut shares_left_to_fill: u128) -> (u128, u128) {
+	fn fill_matches(&mut self, outcome: u64, mut spend: u128, price_per_share: u128, mut shares_filled: u128) -> (u128, u128) {
 		let market_price = self.get_market_price(outcome);
-		if price_per_share < market_price || spend == 0 { return (spend, shares_left_to_fill); }
+		let mut shares_to_fill = spend / market_price;
+		if price_per_share < market_price || spend < 100 { return (spend, shares_filled); }
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		let shares_fillable = self.get_min_shares_fillable(outcome);
-		let mut shares_to_fill = shares_left_to_fill;
+		self.last_price_for_outcomes.insert(outcome, market_price);
 
 		if shares_fillable < shares_to_fill {
 			shares_to_fill = shares_fillable;
@@ -78,14 +85,15 @@ impl Market {
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
 			if !orderbook.market_order.is_none() {
+				let market_order_price = orderbook.get_market_order_price();
+				self.last_price_for_outcomes.insert(orderbook_id, market_order_price);
 				orderbook.fill_market_order(shares_to_fill);
 			}
 		}
-
 		spend -= shares_to_fill * market_price;
-		shares_left_to_fill -= shares_to_fill;
+		shares_filled += shares_to_fill;
 		
-		return self.fill_matches(outcome, spend, price_per_share, shares_left_to_fill);
+		return self.fill_matches(outcome, spend, price_per_share, shares_filled);
 	}
 
 	pub fn get_min_shares_fillable(&self, outcome: u64) -> u128 {
@@ -131,7 +139,6 @@ impl Market {
 				market_price -= market_order_price_per_share.unwrap();
 			}
 		}
-
 		return market_price;
 	}
 

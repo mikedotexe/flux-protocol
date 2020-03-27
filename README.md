@@ -35,6 +35,3 @@ Run the test
 ```
 cargo test --package flux-protocol
 ```
-
-## Side notes
-To test using an existing version of the protocol please checkout [deployment](https://github.com/jasperdg/flux-protocol/tree/master/deployment)
