@@ -213,7 +213,7 @@ impl Markets {
 impl Default for Markets {
 	fn default() -> Self {
 		Self {
-			creator: "klopt".to_string(),
+			creator: "flux-dev".to_string(),
 			active_markets: BTreeMap::new(),
 			nonce: 0,
 			fdai_balances: HashMap::new(),	
