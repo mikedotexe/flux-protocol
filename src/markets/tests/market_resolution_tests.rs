@@ -8,7 +8,7 @@ fn test_invalid_market_payout_calc() {
 	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), 100010101001010);
 
 	let rounded_10k_at_70 = (10000 / 70) * 70;
-	let mut amount_filled_after_cancel = 10000 - 2840;
+	let amount_filled_after_cancel = 10000 - 2840;
 	let expected_carol_balance = (2 * rounded_10k_at_70 + 3 * 10000) - amount_filled_after_cancel;
 	contract.place_order(0, 0, 10000, 70);
 	contract.place_order(0, 0, 10000, 70);
@@ -36,12 +36,12 @@ fn test_invalid_market_payout_calc() {
 	assert_eq!(claimable_alice, expected_alice_balance);
 
 	// Orderbook length assertions
-	let mut open_0_orders = contract.get_open_orders(0, 0, carol());
-	let mut open_1_orders = contract.get_open_orders(0, 1, carol());
-	let mut open_2_orders = contract.get_open_orders(0, 2, carol());
-	let mut filled_0_orders = contract.get_filled_orders(0, 0, carol());
-	let mut filled_1_orders = contract.get_filled_orders(0, 1, carol());
-	let mut filled_2_orders = contract.get_filled_orders(0, 2, carol());
+	let open_0_orders = contract.get_open_orders(0, 0, carol());
+	let open_1_orders = contract.get_open_orders(0, 1, carol());
+	let open_2_orders = contract.get_open_orders(0, 2, carol());
+	let filled_0_orders = contract.get_filled_orders(0, 0, carol());
+	let filled_1_orders = contract.get_filled_orders(0, 1, carol());
+	let filled_2_orders = contract.get_filled_orders(0, 2, carol());
 
 	// // debugging logs
 	// println!("open 0 {:?}", open_0_orders);
@@ -53,7 +53,7 @@ fn test_invalid_market_payout_calc() {
 	// println!("filled 2 {:?}", filled_2_orders);
 
 	assert_eq!(open_0_orders.len(), 0);
-	assert_eq!(filled_0_orders.len(),3);
+	assert_eq!(filled_0_orders.len(), 3);
 
 	assert_eq!(open_1_orders.len(), 1);
 	assert_eq!(filled_1_orders.len(), 2);
@@ -81,12 +81,12 @@ fn test_valid_market_payout_calc() {
 	testing_env!(get_context(carol()));
 	contract.resolute(0, Some(1));
 
-	let mut open_0_orders = contract.get_open_orders(0, 0, carol());
-	let mut open_1_orders = contract.get_open_orders(0, 1, carol());
-	let mut open_2_orders = contract.get_open_orders(0, 2, carol());
-	let mut filled_0_orders = contract.get_filled_orders(0, 0, carol());
-	let mut filled_1_orders = contract.get_filled_orders(0, 1, carol());
-	let mut filled_2_orders = contract.get_filled_orders(0, 2, carol());
+	let open_0_orders = contract.get_open_orders(0, 0, carol());
+	let open_1_orders = contract.get_open_orders(0, 1, carol());
+	let open_2_orders = contract.get_open_orders(0, 2, carol());
+	let filled_0_orders = contract.get_filled_orders(0, 0, carol());
+	let filled_1_orders = contract.get_filled_orders(0, 1, carol());
+	let filled_2_orders = contract.get_filled_orders(0, 2, carol());
 
 	// // uncomment for orderbook state check
 	// println!("open {:?}", 	open_0_orders);

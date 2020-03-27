@@ -98,21 +98,20 @@ impl Markets {
 		let from = env::predecessor_account_id();
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, false);
-		let orderbook = market.orderbooks.get_mut(&outcome).unwrap();
+		let mut orderbook = market.orderbooks.get_mut(&outcome).unwrap();
 
-    let orders_by_user_vec = orderbook.orders_by_user.get_mut(&from).unwrap();
-    for i in 0..orders_by_user_vec.len() {
-        // v = [outcome, price, order_id]
-        let v: Vec<&str> = orders_by_user_vec[i].rsplit("::").collect();
-        if v[2].parse::<u128>().unwrap() == order_id {
-            let outstanding_spend = orderbook.remove_order(order_id, v[1].parse::<u128>().unwrap());
-            market.liquidity -= outstanding_spend;
-            self.add_balance(outstanding_spend);
-            return;
+        let orders_by_user_vec = orderbook.orders_by_user.get(&from).unwrap();
+        for i in 0..orders_by_user_vec.len() {
+            // v = [outcome, price, order_id]
+            let v: Vec<&str> = orders_by_user_vec[i].rsplit("::").collect();
+            if v[2].parse::<u128>().unwrap() == order_id {
+                let outstanding_spend = orderbook.remove_order(order_id, v[1].parse::<u128>().unwrap());
+                market.liquidity -= outstanding_spend;
+                self.add_balance(outstanding_spend);
+                return;
+            }
         }
     }
-    return;
-	}
 
 	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
 		let from = env::predecessor_account_id();
@@ -155,7 +154,7 @@ impl Markets {
 	}
 
 	pub fn get_claimable(&self, market_id: u64, from: String) -> u128 {
-		return self.active_markets.get(&market_id).unwrap().get_claimable(from);	
+		return self.active_markets.get(&market_id).unwrap().get_claimable(from);
 	}
 
 	pub fn claim_earnings(&mut self, market_id: u64, accountId: String) {
@@ -195,11 +194,6 @@ impl Markets {
 
 	pub fn get_owner(&self) -> String {
 		return self.creator.to_string();
-	}
-
-	pub fn get_market_order(&self, market_id: u64, outcome: u64)  -> Option<u128> {
-		let market = self.active_markets.get(&market_id).unwrap();
-		return market.orderbooks[&outcome].market_order;
 	}
 
 	pub fn get_market_price(&self, market_id: u64, outcome: u64) -> u128 {
@@ -290,7 +284,6 @@ mod tests {
 	}
 
 	mod init_tests;
-	mod bst_tests;
 	mod market_order_tests;
 	mod binary_order_matching_tests;
 	mod categorical_market_tests;
