@@ -72,7 +72,7 @@ impl Orderbook {
 			self.market_order = Some(price_per_share);
 		} else {
 			if let Some((current_market_price, _ )) = self.open_orders.iter().next() {
-			    if price_per_share < *current_market_price {
+			    if price_per_share > *current_market_price {
                     self.market_order = Some(price_per_share);
                 }
 			}
@@ -98,13 +98,16 @@ impl Orderbook {
             }
         }
 
+
         // Remove from order map
         order_map.remove(&order_id);
         if order_map.is_empty() {
             self.open_orders.remove(&price_per_share);
             if let Some((min_key, _ )) = self.open_orders.iter().next() {
                 self.market_order = Some(*min_key);
-            }
+            } else {
+				self.market_order = None;
+			}
         }
         return outstanding_spend;
 	}

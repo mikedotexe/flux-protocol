@@ -11,23 +11,24 @@ fn test_market_orders() {
 	contract.place_order(0, 1, 5000, 50); // 0 
 	contract.place_order(0, 1, 5000, 50); // 1
 
-	let mut yes_market_price = contract.get_market_price(0, 1);
+	let mut yes_market_price = contract.get_market_price(0, 0);
 	assert_eq!(yes_market_price, 50);
 
 	contract.place_order(0, 1, 5000, 60); // 2
-	yes_market_price= contract.get_market_price(0, 1);
+	yes_market_price= contract.get_market_price(0, 0);
+	println!("{}", yes_market_price);
 	assert_eq!(yes_market_price, 40);
 
-	contract.cancel_order(0, 1, 2);
-	yes_market_price = contract.get_market_price(0, 1);
+	contract.cancel_order(0, 1, 2, 60);
+	yes_market_price = contract.get_market_price(0, 0);
 	assert_eq!(yes_market_price, 50);
 
-	contract.cancel_order(0, 1, 1);
-	yes_market_price = contract.get_market_price(0, 1);
+	contract.cancel_order(0, 1, 1, 50);
+	yes_market_price = contract.get_market_price(0, 0);
 	assert_eq!(yes_market_price, 50);
 	
-	contract.cancel_order(0, 1, 0);
-	yes_market_price = contract.get_market_price(0, 1);
+	contract.cancel_order(0, 1, 0, 50);
+	yes_market_price = contract.get_market_price(0, 0);
 	assert_eq!(yes_market_price, 100);
 
 }
