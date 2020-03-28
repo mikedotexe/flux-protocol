@@ -92,8 +92,8 @@ impl Market {
 		}
 		spend -= shares_to_fill * market_price;
 		shares_filled += shares_to_fill;
-		
-		return self.fill_matches(outcome, spend, price_per_share, shares_filled);
+
+		return (spend, shares_filled);
 	}
 
 	pub fn get_min_shares_fillable(&self, outcome: u64) -> u128 {
@@ -114,7 +114,6 @@ impl Market {
                 }
             }
 		}
-
 		return shares.unwrap();
 	}
 
