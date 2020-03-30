@@ -94,14 +94,14 @@ impl Markets {
 		self.subtract_balance(rounded_spend);
 	}
 
-	pub fn cancel_order(&mut self, market_id: u64, outcome: u64, order_id: u128, price: u128) {
+	pub fn cancel_order(&mut self, market_id: u64, outcome: u64, order_id: u128) {
 		let from = env::predecessor_account_id();
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, false);
 		let order_location = format!("{outcome_id}::{price_per_share}::{order_id}", outcome_id=outcome, price_per_share=price, order_id=order_id);
 		let mut orderbook = market.orderbooks.get_mut(&outcome).unwrap();
 		assert!(!orderbook.orders_by_user.get(&order_location).is_none(), "can only cancel orders owned by user");
-		orderbook.remove_order(order_id, price);
+		orderbook.remove_order(order_id);
     }
 
 	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
@@ -132,13 +132,13 @@ impl Markets {
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
 	}
 
-	pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, BTreeMap<u128, Order>> {
+	pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> &HashMap<u128, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 		return &orderbook.open_orders;
 	}
 	
-	pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, BTreeMap<u128, Order>> {
+	pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> &HashMap<u128, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 		return &orderbook.filled_orders;
@@ -148,12 +148,12 @@ impl Markets {
 		return self.active_markets.get(&market_id).unwrap().get_claimable(from);
 	}
 
-	pub fn claim_earnings(&mut self, market_id: u64, accountId: String) {
+	pub fn claim_earnings(&mut self, market_id: u64, account_id: String) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, true);
 		
-		let claimable = market.get_claimable(accountId.to_string());	
-		market.delete_orders_for(accountId.to_string());
+		let claimable = market.get_claimable(account_id.to_string());	
+		market.delete_orders_for(account_id.to_string());
 
 		self.add_balance(claimable);
 	}
@@ -275,9 +275,9 @@ mod tests {
 	}
 
 	// mod init_tests;
-	mod market_order_tests;
+	// mod market_order_tests;
 	// mod binary_order_matching_tests;
 	// mod categorical_market_tests;
-	// mod market_resolution_tests;
-	// mod claim_earnings_tests;
+	mod market_resolution_tests;
+	mod claim_earnings_tests;
 }

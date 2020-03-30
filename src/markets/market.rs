@@ -101,11 +101,12 @@ impl Market {
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
-
-            if let Some((market_order_price_per_share, market_order_map)) = orderbook.open_orders.iter().next() {
+			
+            if let Some((market_order_price_per_share, market_order_map)) = orderbook.orders_by_price.iter().next() {
                 let mut left_to_fill = 0;
                 let mut shares_to_fill = 0;
-                for (_, order) in market_order_map.iter() {
+                for (order_id, _) in market_order_map.iter() {
+					let order = orderbook.open_orders.get(&order_id).unwrap();
                     left_to_fill += order.spend - order.filled;
                     shares_to_fill += left_to_fill / market_order_price_per_share;
                 }
