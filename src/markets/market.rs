@@ -82,6 +82,7 @@ impl Market {
 			shares_to_fill = shares_fillable;
 		}
 		
+
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
 			if !orderbook.market_order.is_none() {

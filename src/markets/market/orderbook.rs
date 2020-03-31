@@ -86,26 +86,27 @@ impl Orderbook {
 
     // Remove order from orderbook -- added price_per_share - if invalid order id passed behaviour undefined
 	pub fn remove_order(&mut self, order_id: u128) -> u128 {
-		// Get orders at price
-		let order = self.open_orders.get_mut(&order_id).unwrap();
+		// Store copy or order to remove
+		let order = self.open_orders.get_mut(&order_id).unwrap().clone();
+		// Remove original order from open_orders
+		self.open_orders.remove(&order.id);
 
         let outstanding_spend = order.spend - order.filled;
         *self.spend_by_user.get_mut(&order.creator).unwrap() -= outstanding_spend;
 
         // Add back to filled if eligible, remove from user map if not
         if order.shares_filled > 0 {
-            self.filled_orders.insert(order.id, order.clone());
+			self.filled_orders.insert(order.id, order.clone());
         } else {
             let order_by_user_vec = self.orders_by_user.get_mut(&order.creator).unwrap();
             order_by_user_vec.swap_remove(order_id.try_into().unwrap());
             if order_by_user_vec.is_empty() {
                 self.orders_by_user.remove(&order.creator);
             }
-        }
-
+		}
 
 		// Remove from order tree
-		let order_map = self.orders_by_price.get_mut(&order_id).unwrap();
+		let order_map = self.orders_by_price.get_mut(&order.price_per_share).unwrap();
         order_map.remove(&order_id);
         if order_map.is_empty() {
             self.orders_by_price.remove(&order.price_per_share);
@@ -123,10 +124,10 @@ impl Orderbook {
 	    let mut to_remove : Vec<(u128, u128)> = vec![];
 
 		if let Some(( _ , current_order_map)) = self.orders_by_price.iter_mut().next() {
-		    // Iteratively fill market orders until done
+			// Iteratively fill market orders until done
             for (order_id, _) in current_order_map.iter_mut() {
 				let order = self.open_orders.get_mut(&order_id).unwrap();
-
+				// println!("get here: {:?}, {:?}", order_id, self.open_orders);
                 if amt_of_shares_to_fill > 0 {
                     let shares_remaining_in_order = order.amt_of_shares - order.shares_filled;
                     let filling = cmp::min(shares_remaining_in_order, amt_of_shares_to_fill);
@@ -152,7 +153,8 @@ impl Orderbook {
 
 	pub fn calc_claimable_amt(&self, from: String) -> u128 {
 		let mut claimable = 0;
-		let orders_by_user_vec = self.orders_by_user.get(&from).unwrap();
+		let empty_vec: Vec<u128> = vec![];
+		let orders_by_user_vec = self.orders_by_user.get(&from).unwrap_or(&empty_vec);
 
 		for i in 0..orders_by_user_vec.len() {
 			let order_id = &orders_by_user_vec[i];
@@ -208,12 +210,17 @@ impl Orderbook {
 
 	pub fn get_open_order_value_for(&self, from: String) -> u128 {
 		let mut claimable = 0;
-		let orders_by_user_vec = self.orders_by_user.get(&from).unwrap();
-
+		let empty_vec: Vec<u128> = vec![];
+		let orders_by_user_vec = self.orders_by_user.get(&from).unwrap_or(&empty_vec);
+		
         for i in 0..orders_by_user_vec.len() {
-            let order_id = orders_by_user_vec[i];
-            let order = self.open_orders.get(&order_id).unwrap();
-            claimable += order.shares_filled * 100;
+			let order_id = orders_by_user_vec[i];
+			let open_order_prom = self.open_orders.get(&order_id);
+			let order_is_open = !open_order_prom.is_none();
+			if order_is_open {
+				let order = self.open_orders.get(&order_id).unwrap();
+				claimable += order.shares_filled * 100;
+			}
         }
 		return claimable;
 	}
