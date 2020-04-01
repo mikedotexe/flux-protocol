@@ -159,6 +159,7 @@ impl Market {
 
 	pub fn resolute(&mut self,from: String, winning_outcome: Option<u64>) {
 		// TODO: Make sure market can only be resoluted after end time
+		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false);
 		assert_eq!(from, self.creator);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
@@ -168,6 +169,7 @@ impl Market {
 	
 	pub fn get_claimable(&self, from: String) -> u128 {
 		assert_eq!(self.resoluted, true);
+		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 

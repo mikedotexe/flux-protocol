@@ -150,6 +150,7 @@ impl Markets {
 
 	pub fn claim_earnings(&mut self, market_id: u64, account_id: String) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
+		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		assert_eq!(market.resoluted, true);
 		
 		let claimable = market.get_claimable(account_id.to_string());
