@@ -91,7 +91,8 @@ impl Orderbook {
 		// Remove original order from open_orders
 		self.open_orders.remove(&order.id);
 
-        let outstanding_spend = order.spend - order.filled;
+		let outstanding_spend = order.spend - order.filled;
+
         *self.spend_by_user.get_mut(&order.creator).unwrap() -= outstanding_spend;
 
         // Add back to filled if eligible, remove from user map if not
@@ -155,41 +156,29 @@ impl Orderbook {
 		let mut claimable = 0;
 		let empty_vec: Vec<u128> = vec![];
 		let orders_by_user_vec = self.orders_by_user.get(&from).unwrap_or(&empty_vec);
-
 		for i in 0..orders_by_user_vec.len() {
 			let order_id = &orders_by_user_vec[i];
 			let open_order_prom = self.open_orders.get(&order_id);
 			let open_order_exists = !open_order_prom.is_none();
 			if open_order_exists {
+				// Handle amount
 				let order = open_order_prom.unwrap();
 				claimable += order.shares_filled * 100;
 			} else {
+				// Check if completely filled or if it's a canceled order.
 				let filled_order = self.filled_orders.get(&order_id).unwrap();
 				claimable += filled_order.shares_filled * 100;
 			}
-
 		}
+
 		return claimable;
 	}
 
 	// TODO: shouldn't be deleted but maybe flagged claimed - this way we can retain an order history
 	pub fn delete_orders_for(&mut self, from: String) {
-	    let mut to_delete : Vec<u128> = vec![];
-        self.spend_by_user.insert(from.to_string(), 0);
-        let orders_by_user_vec = self.orders_by_user.get(&from).unwrap();
-
-        for order_id in orders_by_user_vec {
-            to_delete.push(*order_id);
-        }
-
-        for order_id in to_delete {
-			let open_order_exists = !self.open_orders.get(&order_id).is_none();
-			if open_order_exists {
-				self.remove_order(order_id);
-			} else {
-				self.remove_filled_order(order_id);
-			}
-        }
+	    let mut to_delete : Vec<u128> = vec![];		
+		let mut empty_vec = &mut vec![];
+        *self.orders_by_user.get_mut(&from).unwrap_or(empty_vec) = vec![];
 	}
 
     fn remove_filled_order(&mut self, order_id : u128) {
@@ -219,7 +208,7 @@ impl Orderbook {
 			let order_is_open = !open_order_prom.is_none();
 			if order_is_open {
 				let order = self.open_orders.get(&order_id).unwrap();
-				claimable += order.shares_filled * 100;
+				claimable += order.spend - order.filled;
 			}
         }
 		return claimable;
