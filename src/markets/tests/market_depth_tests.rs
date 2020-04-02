@@ -5,7 +5,7 @@ fn test_valid_binary_market_depth() {
 	testing_env!(get_context(carol(), current_block_timestamp()));	
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(4), categories(), market_end_timestamp());
+	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), market_end_timestamp());
 	contract.place_order(0, 0, 6000, 60);
 	contract.place_order(0, 0, 7000, 70);
 

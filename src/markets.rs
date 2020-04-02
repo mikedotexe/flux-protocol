@@ -182,8 +182,8 @@ impl Markets {
 	}
 
 	pub fn get_liquidity(&self, market_id: u64, outcome: u64, spend: u128, price: u128) -> (u128, u128, u128) {
-		let orderbook = self.active_markets.get(&market_id).unwrap().orderbooks.get(&outcome).unwrap();
-		return orderbook.get_liquidity(spend, price);
+		let market = self.active_markets.get(&market_id).unwrap();
+		return market.get_liquidity(outcome, spend, price);
 	}
 
 	pub fn get_market(&self, id: u64) -> &Market {
@@ -197,7 +197,7 @@ impl Markets {
 
 	pub fn get_market_price(&self, market_id: u64, outcome: u64) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
-		return market.get_market_price(outcome);
+		return market.get_best_price(outcome);
 	}
 
 	pub fn get_market_prices(&self, market_id: u64) -> BTreeMap<u64, u128> {
@@ -294,5 +294,5 @@ mod tests {
 	mod categorical_market_tests;
 	mod market_resolution_tests;
 	mod claim_earnings_tests;
-	mod market_depth_tests;
+	// mod market_depth_tests;
 }

@@ -12,7 +12,7 @@ pub type Order = order::Order;
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Orderbook {
 	pub root: Option<u128>,
-	pub market_order: Option<u128>,
+	pub best_price: Option<u128>,
 	pub open_orders: HashMap<u128, Order>,
 	pub filled_orders: HashMap<u128, Order>,
 	pub spend_by_user: HashMap<String, u128>,
@@ -32,7 +32,7 @@ impl Orderbook {
 			orders_by_price: BTreeMap::new(),
 			orders_by_user: HashMap::new(),
 			claimed_orders_by_user: HashMap::new(),
-			market_order: None,
+			best_price: None,
 			nonce: 0,
 			outcome_id: outcome,
 		}
@@ -59,7 +59,7 @@ impl Orderbook {
 		}
 
         // If there is a remaining order, set this new order as the new market rate
-		self.set_market_order(price_per_share);
+		self.set_best_price(price_per_share);
 
         // Insert order into order map
 		self.open_orders.insert(order_id, new_order);
@@ -73,14 +73,14 @@ impl Orderbook {
 	}
 
     // Updates current market order price
-	fn set_market_order(&mut self, price_per_share: u128) {
-		let current_market_order_price = self.market_order;
-		if current_market_order_price.is_none() {
-			self.market_order = Some(price_per_share);
+	fn set_best_price(&mut self, price_per_share: u128) {
+		let current_best_price = self.best_price;
+		if current_best_price.is_none() {
+			self.best_price = Some(price_per_share);
 		} else {
 			if let Some((current_market_price, _ )) = self.open_orders.iter().next() {
 			    if price_per_share > *current_market_price {
-                    self.market_order = Some(price_per_share);
+                    self.best_price = Some(price_per_share);
                 }
 			}
 		}
@@ -114,16 +114,16 @@ impl Orderbook {
         if order_map.is_empty() {
             self.orders_by_price.remove(&order.price_per_share);
             if let Some((min_key, _ )) = self.orders_by_price.iter().next() {
-                self.market_order = Some(*min_key);
+                self.best_price = Some(*min_key);
             } else {
-				self.market_order = None;
+				self.best_price = None;
 			}
         }
         return outstanding_spend;
 	}
 
 	// TODO: Should catch these rounding errors earlier, right now some "dust" will be lost.
-	pub fn fill_market_order(&mut self, mut amt_of_shares_to_fill: u128) {
+	pub fn fill_best_orders(&mut self, mut amt_of_shares_to_fill: u128) {
 	    let mut to_remove : Vec<(u128, u128)> = vec![];
 
 		if let Some(( _ , current_order_map)) = self.orders_by_price.iter_mut().next() {
@@ -196,8 +196,8 @@ impl Orderbook {
         self.filled_orders.remove(&order_id);
     }
 
-	pub fn get_market_order_price(&self) -> u128 {
-		return self.market_order.unwrap();
+	pub fn get_best_price(&self) -> u128 {
+		return self.best_price.unwrap();
 	}
 
 	pub fn get_open_order_value_for(&self, from: String) -> u128 {
@@ -243,8 +243,8 @@ impl Orderbook {
 
     // Returns (max price needed to pay, number of shares to be purchased, total spend)
 	pub fn get_liquidity(&self, spend: u128, max_price: u128) -> (u128, u128, u128) {
-	    if self.market_order.is_none() {return (0,0,0)}
-	    let market_price = self.market_order.unwrap();
+	    if self.best_price.is_none() {return (0,0,0)}
+	    let market_price = self.best_price.unwrap();
 	    if market_price > max_price {return (0,0,0)};
 
         let mut max_price_filled = max_price;
