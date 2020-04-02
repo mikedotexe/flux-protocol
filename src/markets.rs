@@ -45,7 +45,7 @@ impl Markets {
 		let from = env::predecessor_account_id();
 		let can_claim = self.fdai_balances.get(&from).is_none();
 		assert!(can_claim, "user has already claimed fdai");
-		
+
 		let claim_amount = 100 * self.dai_token();
 		self.fdai_balances.insert(from, claim_amount);
 
@@ -85,7 +85,7 @@ impl Markets {
 		let from = env::predecessor_account_id();
 		let balance = self.fdai_balances.get(&from).unwrap();
 		assert!(balance >= &spend);
-		
+
 		let amount_of_shares = spend / price_per_share;
 		let rounded_spend = amount_of_shares * price_per_share;
 		let market = self.active_markets.get_mut(&market_id).unwrap();
@@ -98,13 +98,11 @@ impl Markets {
 		let from = env::predecessor_account_id();
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, false);
-		let orderbook = market.orderbooks.get_mut(&outcome).unwrap();
+		let mut orderbook = market.orderbooks.get_mut(&outcome).unwrap();
 		let order = orderbook.open_orders.get(&order_id).unwrap();
-		assert_eq!(order.creator, from);
-		let outstanding_spend = orderbook.remove_order(order_id);
-		market.liquidity -= outstanding_spend;
-		self.add_balance(outstanding_spend)
-	}
+		assert!(from == order.creator);
+		orderbook.remove_order(order_id);
+    }
 
 	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
 		let from = env::predecessor_account_id();
@@ -134,37 +132,37 @@ impl Markets {
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
 	}
 
-	pub fn get_open_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, Order> {
+	pub fn get_open_orders(&self, market_id: u64, outcome: u64) -> &HashMap<u128, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 		return &orderbook.open_orders;
 	}
-	
-	pub fn get_filled_orders(&self, market_id: u64, outcome: u64, from: String) -> &BTreeMap<u128, Order> {
+
+	pub fn get_filled_orders(&self, market_id: u64, outcome: u64) -> &HashMap<u128, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 		return &orderbook.filled_orders;
 	}
 
 	pub fn get_claimable(&self, market_id: u64, from: String) -> u128 {
-		return self.active_markets.get(&market_id).unwrap().get_claimable(from);	
+		return self.active_markets.get(&market_id).unwrap().get_claimable(from);
 	}
 
-	pub fn claim_earnings(&mut self, market_id: u64, accountId: String) {
+	pub fn claim_earnings(&mut self, market_id: u64, account_id: String) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, true);
-		
-		let claimable = market.get_claimable(accountId.to_string());	
-		market.delete_orders_for(accountId.to_string());
+
+		let claimable = market.get_claimable(account_id.to_string());
+		market.delete_orders_for(account_id.to_string());
 
 		self.add_balance(claimable);
 	}
 
-	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> { 
+	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> {
 		return &self.active_markets;
 	}
 
-	pub fn get_markets_by_id(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> { 
+	pub fn get_markets_by_id(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> {
 		let mut markets = BTreeMap::new();
 		for market_id in market_ids {
 			markets.insert(market_id, self.active_markets.get(&market_id).unwrap());
@@ -172,7 +170,7 @@ impl Markets {
 		return markets;
 	}
 
-	pub fn get_specific_markets(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> { 
+	pub fn get_specific_markets(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> {
 		let mut markets = BTreeMap::new();
 		for market_id in 0..market_ids.len() {
 			markets.insert(market_id as u64, self.active_markets.get(&(market_id as u64)).unwrap());
@@ -187,11 +185,6 @@ impl Markets {
 
 	pub fn get_owner(&self) -> String {
 		return self.creator.to_string();
-	}
-
-	pub fn get_market_order(&self, market_id: u64, outcome: u64)  -> Option<u128> {
-		let market = self.active_markets.get(&market_id).unwrap();
-		return market.orderbooks[&outcome].market_order;
 	}
 
 	pub fn get_market_price(&self, market_id: u64, outcome: u64) -> u128 {
@@ -216,7 +209,7 @@ impl Default for Markets {
 			creator: "flux-dev".to_string(),
 			active_markets: BTreeMap::new(),
 			nonce: 0,
-			fdai_balances: HashMap::new(),	
+			fdai_balances: HashMap::new(),
 			fdai_circulation: 0,
 			fdai_in_protocol: 0,
 			fdai_outside_escrow: 0,
@@ -234,15 +227,15 @@ mod tests {
 
 	fn alice() -> String {
 		return "alice.near".to_string();
-	} 
+	}
 
 	fn carol() -> String {
 		return "carol.near".to_string();
-	} 
+	}
 
 	fn bob() -> String {
 		return "bob.near".to_string();
-	} 
+	}
 
 	fn empty_string() -> String {
 		return "".to_string();
@@ -282,10 +275,10 @@ mod tests {
 	}
 
 	mod init_tests;
-	mod bst_tests;
 	mod market_order_tests;
 	mod binary_order_matching_tests;
 	mod categorical_market_tests;
 	mod market_resolution_tests;
 	mod claim_earnings_tests;
+	mod market_depth_tests;
 }
