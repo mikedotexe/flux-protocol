@@ -2,25 +2,29 @@ use super::*;
 
 #[test]
 fn test_invalid_market_payout_calc() {
-	testing_env!(get_context(carol()));
+	testing_env!(get_context(carol(), market_creation_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), market_creation_timestamp() + 1);
+
 
 	contract.place_order(0, 0, 7000, 70);
 	contract.place_order(0, 1, 1000, 10); 
 	contract.place_order(0, 2, 1000, 10); 
 	contract.place_order(0, 3, 1000, 10);
 	
-	testing_env!(get_context(alice()));
+	testing_env!(get_context(alice(), market_creation_timestamp()));
 	contract.claim_fdai();
 
 	contract.place_order(0, 0, 6000, 60);
 	contract.place_order(0, 1, 2000, 20); 
 	contract.place_order(0, 2, 2000, 20); 
 
-	testing_env!(get_context(carol()));
+	let market_end_timestamp = market_creation_timestamp() + 1;
+	
+	testing_env!(get_context(carol(), market_end_timestamp));
 	contract.resolute(0, None);
+	
 	let claimable_carol = contract.get_claimable(0, carol());
 	let claimable_alice = contract.get_claimable(0, alice());
 	assert_eq!(claimable_carol, 10000);
@@ -50,20 +54,22 @@ fn test_invalid_market_payout_calc() {
 
 #[test]
 fn test_valid_market_payout_calc() {
-	testing_env!(get_context(carol()));
+	testing_env!(get_context(carol(), market_creation_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), market_creation_timestamp() + 1);
+
 
 	contract.place_order(0, 0, 7000, 70);
 	
-	testing_env!(get_context(alice()));
+	testing_env!(get_context(alice(), market_creation_timestamp()));
 	contract.claim_fdai();
 	contract.place_order(0, 1, 1000, 10); 
 	contract.place_order(0, 2, 2000, 20); 
 
 
-	testing_env!(get_context(carol()));
+	let market_end_timestamp = market_creation_timestamp() + 1;
+	testing_env!(get_context(carol(), market_end_timestamp));
 	contract.resolute(0, Some(1));
 
 	let open_orders_0 = contract.get_open_orders(0, 0);
@@ -83,8 +89,8 @@ fn test_valid_market_payout_calc() {
 	assert_eq!(filled_orders_2.len(), 1);
 
 
-	let claimable_carol = contract.get_claimable(0, carol());
-	let claimable_alice = contract.get_claimable(0, alice());
+	let claimable_carol = contract.get_claimable(0, carol()) ;
+	let claimable_alice = contract.get_claimable(0, alice()) ;
 
 	assert_eq!(claimable_carol, 0);
 	assert_eq!(claimable_alice, 10000);

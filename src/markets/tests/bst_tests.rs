@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn test_bst_additions() {
-	testing_env!(get_context(carol()));
+	testing_env!(get_context(carol(), market_creation_timestamp()));
 	
 	let mut contract = Markets::default();
 	contract.claim_fdai();
@@ -74,7 +74,7 @@ fn test_bst_additions() {
 
 #[test]
 fn test_bst_removal() {
-	testing_env!(get_context(carol()));
+	testing_env!(get_context(carol(), market_creation_timestamp()));
 	
 	let mut contract = Markets::default();
 	contract.claim_fdai();

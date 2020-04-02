@@ -64,7 +64,9 @@ impl Markets {
 		assert!(outcomes > 1);
 		assert!(outcomes == 2 || outcomes == outcome_tags.len() as u64);
 		assert!(outcomes < 20); // up for change
+		assert!(end_time > env::block_timestamp());
 		assert!(categories.len() < 6);
+
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
 		// TODO check if end_time hasn't happened yet
 		let from = env::predecessor_account_id();
@@ -254,8 +256,12 @@ mod tests {
 		return outcomes;
 	}
 
+	fn market_creation_timestamp() -> u64 {
+		return 123789;
+	}
 
-	fn get_context(predecessor_account_id: String) -> VMContext {
+
+	fn get_context(predecessor_account_id: String, block_timestamp: u64) -> VMContext {
 		VMContext {
 			current_account_id: alice(),
             signer_account_id: bob(),
@@ -266,7 +272,7 @@ mod tests {
             account_balance: 0,
 			is_view: false,
             storage_usage: 0,
-			block_timestamp: 123789,
+			block_timestamp: block_timestamp,
 			account_locked_balance: 0,
             attached_deposit: 0,
             prepaid_gas: 10u64.pow(11),

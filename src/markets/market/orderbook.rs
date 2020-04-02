@@ -178,9 +178,8 @@ impl Orderbook {
 
 	// TODO: shouldn't be deleted but maybe flagged claimed - this way we can retain an order history
 	pub fn delete_orders_for(&mut self, from: String) {
-	    let mut to_delete : Vec<u128> = vec![];
-		let mut empty_vec = &mut vec![];
-		let orders_by_user_copy = self.orders_by_user.get(&from).unwrap().clone();
+		let empty_vec = &mut vec![];
+		let orders_by_user_copy = self.orders_by_user.get(&from).unwrap_or(empty_vec).clone();
 		self.claimed_orders_by_user.insert(from.to_string(), orders_by_user_copy);
         *self.orders_by_user.get_mut(&from).unwrap_or(empty_vec) = vec![];
 	}

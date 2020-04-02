@@ -2,14 +2,15 @@ use super::*;
 
 #[test]
 fn test_valid_market_depth() {
-	testing_env!(get_context(carol()));
+	testing_env!(get_context(carol(), market_creation_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), market_creation_timestamp() + 1);
+
 
 	contract.place_order(0, 0, 6000, 60);
 
-	testing_env!(get_context(alice()));
+	testing_env!(get_context(alice(), market_creation_timestamp()));
 	contract.claim_fdai();
 	contract.place_order(0, 1, 1000, 10);
 	contract.place_order(0, 2, 1000, 23);

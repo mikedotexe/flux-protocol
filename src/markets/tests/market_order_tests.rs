@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn test_market_orders() {
-	testing_env!(get_context(carol()));
+	testing_env!(get_context(carol(), market_creation_timestamp()) );
 	let mut contract = Markets::default();
 	contract.claim_fdai();
 	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), 100010101001010);
