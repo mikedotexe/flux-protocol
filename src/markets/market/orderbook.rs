@@ -48,27 +48,27 @@ impl Orderbook {
 	}
 
     // Places order in orderbook
-	pub fn place_order(&mut self, from: String, outcome: u64, spend: u128, amt_of_shares: u128, price_per_share: u128, filled: u128, shares_filled: u128) {
+	pub fn place_order(&mut self, from: String, outcome: u64, spend: u128, amt_of_shares: u128, price: u128, filled: u128, shares_filled: u128) {
 		let order_id = self.new_order_id();
-		let new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price_per_share, filled, shares_filled);
+		let new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price, filled, shares_filled);
 		*self.spend_by_user.entry(from.to_string()).or_insert(0) += spend;
 
         // If all of spend is filled, state order is fully filled
         let left_to_spend = spend - filled;
 		if left_to_spend < 100 {
-			self.filled_orders.insert(price_per_share, new_order);
+			self.filled_orders.insert(price, new_order);
 			return;
 		}
 
         // If there is a remaining order, set this new order as the new market rate
-		self.set_best_price(price_per_share);
+		self.set_best_price(price);
 
         // Insert order into order map
 		self.open_orders.insert(order_id, new_order);
 
 		// Insert into order tree
-		let orders_at_price = self.orders_by_price.entry(price_per_share).or_insert(HashMap::new());
-		*self.liquidity_by_price.entry(price_per_share).or_insert(0) += left_to_spend;
+		let orders_at_price = self.orders_by_price.entry(price).or_insert(HashMap::new());
+		*self.liquidity_by_price.entry(price).or_insert(0) += left_to_spend;
 		
 		orders_at_price.insert(order_id, true);
 
@@ -77,20 +77,20 @@ impl Orderbook {
 	}
 
     // Updates current market order price
-	fn set_best_price(&mut self, price_per_share: u128) {
+	fn set_best_price(&mut self, price: u128) {
 		let current_best_price = self.best_price;
 		if current_best_price.is_none() {
-			self.best_price = Some(price_per_share);
+			self.best_price = Some(price);
 		} else {
 			if let Some((current_market_price, _ )) = self.open_orders.iter().next() {
-			    if price_per_share > *current_market_price {
-                    self.best_price = Some(price_per_share);
+			    if price > *current_market_price {
+                    self.best_price = Some(price);
                 }
 			}
 		}
 	}
 
-    // Remove order from orderbook -- added price_per_share - if invalid order id passed behaviour undefined
+    // Remove order from orderbook -- added price - if invalid order id passed behaviour undefined
 	pub fn remove_order(&mut self, order_id: u128) -> u128 {
 		// Store copy of order to remove
 		let order = self.open_orders.get_mut(&order_id).unwrap().clone();
@@ -101,7 +101,7 @@ impl Orderbook {
 		let outstanding_spend = order.spend - order.filled;
 		
         *self.spend_by_user.get_mut(&order.creator).unwrap() -= outstanding_spend;
-		*self.liquidity_by_price.entry(order.price_per_share).or_insert(0) -= outstanding_spend;
+		*self.liquidity_by_price.entry(order.price).or_insert(0) -= outstanding_spend;
 		
         // Add back to filled if eligible, remove from user map if not
         if order.shares_filled > 0 {
@@ -117,10 +117,10 @@ impl Orderbook {
 		}
 
 		// Remove from order tree
-		let order_map = self.orders_by_price.get_mut(&order.price_per_share).unwrap();
+		let order_map = self.orders_by_price.get_mut(&order.price).unwrap();
         order_map.remove(&order_id);
         if order_map.is_empty() {
-            self.orders_by_price.remove(&order.price_per_share);
+            self.orders_by_price.remove(&order.price);
             if let Some((min_key, _ )) = self.orders_by_price.iter().next() {
                 self.best_price = Some(*min_key);
             } else {
@@ -143,14 +143,14 @@ impl Orderbook {
                     let shares_remaining_in_order = order.amt_of_shares - order.shares_filled;
 					let filling = cmp::min(shares_remaining_in_order, amt_of_shares_to_fill);
 					
-					*self.liquidity_by_price.entry(order.price_per_share).or_insert(0) -= filling * order.price_per_share;
+					*self.liquidity_by_price.entry(order.price).or_insert(0) -= filling * order.price;
 
                     order.shares_filled += filling;
-					order.filled += filling * order.price_per_share;
+					order.filled += filling * order.price;
 
 
                     if order.spend - order.filled < 100 { // some rounding errors here might cause some stack overflow bugs that's why this is build in.
-                        to_remove.push((*order_id, order.price_per_share));
+                        to_remove.push((*order_id, order.price));
                         self.filled_orders.insert(order.id, order.clone());
                     }
                     amt_of_shares_to_fill -= filling;
@@ -232,12 +232,12 @@ impl Orderbook {
 		return *self.spend_by_user.get(&from).unwrap_or(&0);
 	}
 
-    pub fn get_depth(&self, spend: u128, price_per_share: u128) -> u128 {
-        if self.orders_by_price.get(&price_per_share).is_none() {return 0};
-        let orders_map = self.orders_by_price.get(&price_per_share).unwrap();
+    pub fn get_depth(&self, spend: u128, price: u128) -> u128 {
+        if self.orders_by_price.get(&price).is_none() {return 0};
+        let orders_map = self.orders_by_price.get(&price).unwrap();
 
         let mut depth = 0;
-        let mut purchasable = spend / price_per_share;
+        let mut purchasable = spend / price;
         for (order_id, _) in orders_map.iter() {
             if self.open_orders.get(&order_id).is_none() {continue};
             let order = self.open_orders.get(&order_id).unwrap();
@@ -265,11 +265,11 @@ impl Orderbook {
         let mut max_price_filled = max_price;
         let mut shares = 0;
         let mut filled = 0;
-	    for price_per_share in market_price..max_price+1 { // what does the + 1 do?
-	        let depth = self.get_depth(spend - filled, price_per_share);
+	    for price in market_price..max_price+1 { // what does the + 1 do?
+	        let depth = self.get_depth(spend - filled, price);
 	        shares += depth;
-	        filled = cmp::min(depth*price_per_share + filled, spend);
-	        if depth > 0 {max_price_filled = price_per_share};
+	        filled = cmp::min(depth*price + filled, spend);
+	        if depth > 0 {max_price_filled = price};
             if spend - filled <= 100 {
                 return (max_price_filled, shares, filled)
             }

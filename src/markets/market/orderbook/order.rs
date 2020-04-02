@@ -9,7 +9,7 @@ pub struct Order {
 	pub outcome: u64,
 	pub spend: u128,
 	pub amt_of_shares: u128,
-	pub price_per_share: u128,
+	pub price: u128,
 	pub filled: u128,
 	pub shares_filled: u128,
 	pub parent: Option<u128>,
@@ -19,14 +19,14 @@ pub struct Order {
 
 
 impl Order {
-	pub fn new(creator: String, outcome: u64, id: u128, spend:u128, amt_of_shares: u128, price_per_share: u128, filled: u128, shares_filled: u128) -> Self {
+	pub fn new(creator: String, outcome: u64, id: u128, spend:u128, amt_of_shares: u128, price: u128, filled: u128, shares_filled: u128) -> Self {
 		Order {
 			id,
 			creator,
 			outcome,
 			spend,
 			amt_of_shares,
-			price_per_share,
+			price,
 			filled,
 			shares_filled,
 			parent: None,
@@ -36,7 +36,7 @@ impl Order {
 	}
 
 	pub fn is_better_price_than(&self, compare_order: Order) -> bool {
-		if self.price_per_share > compare_order.price_per_share {
+		if self.price > compare_order.price {
 			return true;
 		} 
 		return false;

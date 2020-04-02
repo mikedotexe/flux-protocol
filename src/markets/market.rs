@@ -59,23 +59,23 @@ impl Market {
 		}
 	}
 
-	pub fn place_order(&mut self, from: String, outcome: u64, amt_of_shares: u128, spend: u128, price_per_share: u128) {
+	pub fn place_order(&mut self, from: String, outcome: u64, amt_of_shares: u128, spend: u128, price: u128) {
 		assert!(spend > 0);
-		assert!(price_per_share > 0 && price_per_share < 100);
+		assert!(price > 0 && price < 100);
 		assert_eq!(self.resoluted, false);
 		assert!(env::block_timestamp() < self.end_time);
-		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price_per_share, 0);
+		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price, 0);
 		let total_spend = spend - spend_filled;
 		self.liquidity += spend;
 		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
-		orderbook.place_order(from, outcome, spend, amt_of_shares, price_per_share, total_spend, shares_filled);
+		orderbook.place_order(from, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
 	}
 
-	fn fill_matches(&mut self, outcome: u64, mut spend: u128, price_per_share: u128, mut shares_filled: u128) -> (u128, u128) {
+	fn fill_matches(&mut self, outcome: u64, mut spend: u128, price: u128, mut shares_filled: u128) -> (u128, u128) {
 		let market_price = self.get_best_price(outcome);
 		let mut shares_to_fill = spend / market_price;
-		if price_per_share < market_price || spend < 100 { return (spend, shares_filled); }
+		if price < market_price || spend < 100 { return (spend, shares_filled); }
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		let shares_fillable = self.get_min_shares_fillable(outcome);
 		self.last_price_for_outcomes.insert(outcome, market_price);
@@ -105,13 +105,13 @@ impl Market {
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
 			
-            if let Some((best_price_per_share, best_order_map)) = orderbook.orders_by_price.iter().next() {
+            if let Some((best_price, best_order_map)) = orderbook.orders_by_price.iter().next() {
                 let mut left_to_fill = 0;
                 let mut shares_to_fill = 0;
                 for (order_id, _) in best_order_map.iter() {
 					let order = orderbook.open_orders.get(&order_id).unwrap();
                     left_to_fill += order.spend - order.filled;
-                    shares_to_fill += left_to_fill / best_price_per_share;
+                    shares_to_fill += left_to_fill / best_price;
                 }
                 if shares.is_none() || shares_to_fill < shares.unwrap() {
                     shares = Some(shares_to_fill);
@@ -136,10 +136,10 @@ impl Market {
 
  		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
-			let best_price_per_share = orderbook.best_price;
+			let best_price = orderbook.best_price;
 
-			if !best_price_per_share.is_none() {
-				market_price -= best_price_per_share.unwrap();
+			if !best_price.is_none() {
+				market_price -= best_price.unwrap();
 			}
 		}
 		return market_price;

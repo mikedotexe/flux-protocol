@@ -83,15 +83,15 @@ impl Markets {
 		self.active_markets.remove(&market_id);
 	}
 
-	pub fn place_order(&mut self, market_id: u64, outcome: u64, spend: u128, price_per_share: u128) {
+	pub fn place_order(&mut self, market_id: u64, outcome: u64, spend: u128, price: u128) {
 		let from = env::predecessor_account_id();
 		let balance = self.fdai_balances.get(&from).unwrap();
 		assert!(balance >= &spend);
 
-		let amount_of_shares = spend / price_per_share;
-		let rounded_spend = amount_of_shares * price_per_share;
+		let amount_of_shares = spend / price;
+		let rounded_spend = amount_of_shares * price;
 		let market = self.active_markets.get_mut(&market_id).unwrap();
-		market.place_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price_per_share);
+		market.place_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price);
 
 		self.subtract_balance(rounded_spend);
 	}
