@@ -121,7 +121,7 @@ impl Market {
 		return shares.unwrap();
 	}
 
-	pub fn get_market_prices(&self) -> BTreeMap<u64, u128> {
+	pub fn get_best_prices(&self) -> BTreeMap<u64, u128> {
 		let mut market_prices: BTreeMap<u64, u128> = BTreeMap::new();
 		for outcome in 0..self.outcomes {
 			let market_price = self.get_best_price(outcome);
@@ -193,9 +193,21 @@ impl Market {
 		let mut max_shares = 0;
 		let mut max_spend = 0;
 
+		let min_spendable: Option<u128> = None;
+		let min_spendable_ordebook: Option<u128> = None;
+		let min_spenable_price: Option<u64> = None;
+
+		let next_market_price = self.get_market_prices();
+		while spend > 0 && next_market_price <= price && !next_market_price.is_none() {
+
+		}
+
 		for orderbook_id in inverse_orderbook_ids {
 			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
-
+			let best_price = orderbook.best_price.unwrap_or(0);
+			if best_price > 0 {
+				orderbook.get_liquidity_for_price(best_price);
+			}
 
 		}
 

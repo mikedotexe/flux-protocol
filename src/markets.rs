@@ -205,9 +205,9 @@ impl Markets {
 		return market.get_best_price(outcome);
 	}
 
-	pub fn get_market_prices(&self, market_id: u64) -> BTreeMap<u64, u128> {
+	pub fn get_best_prices(&self, market_id: u64) -> BTreeMap<u64, u128> {
 		let market = self.active_markets.get(&market_id).unwrap();
-		return market.get_market_prices();
+		return market.get_best_prices();
 	}
 
 	pub fn get_fdai_metrics(&self) -> (u128, u128, u128, u64) {
