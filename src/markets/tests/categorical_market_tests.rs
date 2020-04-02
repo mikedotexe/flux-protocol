@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn test_categorical_market_matches() {
-	testing_env!(get_context(carol(), current_block_timestamp()));	let mut contract = Markets::default();
+	testing_env!(get_context(carol(), current_block_timestamp()));
+	let mut contract = Markets::default();
 	contract.claim_fdai();
 	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(), 100010101001010);
 
@@ -17,7 +18,6 @@ fn test_categorical_market_matches() {
     let filled_0_orders = contract.get_filled_orders(0, 0);
     let filled_1_orders = contract.get_filled_orders(0, 1);
     let filled_2_orders = contract.get_filled_orders(0, 2);
-
 
 	// // uncomment for orderbook state check
 	// println!("{:?}", open_0_orders);
