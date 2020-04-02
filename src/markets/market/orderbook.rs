@@ -17,6 +17,7 @@ pub struct Orderbook {
 	pub filled_orders: HashMap<u128, Order>,
 	pub spend_by_user: HashMap<String, u128>,
 	pub orders_by_price: BTreeMap<u128, HashMap<u128, bool>>,
+	pub liquidity_by_price: BTreeMap<u128, u128>,
 	pub orders_by_user: HashMap<String, Vec<u128>>,
 	pub claimed_orders_by_user: HashMap<String, Vec<u128>>,
 	pub nonce: u128,
@@ -30,6 +31,7 @@ impl Orderbook {
 			filled_orders: HashMap::new(),
 			spend_by_user: HashMap::new(),
 			orders_by_price: BTreeMap::new(),
+			liquidity_by_price: BTreeMap::new(),
 			orders_by_user: HashMap::new(),
 			claimed_orders_by_user: HashMap::new(),
 			best_price: None,
@@ -66,6 +68,8 @@ impl Orderbook {
 
 		// Insert into order tree
 		let orders_at_price = self.orders_by_price.entry(price_per_share).or_insert(HashMap::new());
+		*self.liquidity_by_price.entry(price_per_share).or_insert(0) += left_to_spend;
+		
 		orders_at_price.insert(order_id, true);
 
 
@@ -88,21 +92,25 @@ impl Orderbook {
 
     // Remove order from orderbook -- added price_per_share - if invalid order id passed behaviour undefined
 	pub fn remove_order(&mut self, order_id: u128) -> u128 {
-		// Store copy or order to remove
+		// Store copy of order to remove
 		let order = self.open_orders.get_mut(&order_id).unwrap().clone();
+		
 		// Remove original order from open_orders
 		self.open_orders.remove(&order.id);
-
+		
 		let outstanding_spend = order.spend - order.filled;
-
+		
         *self.spend_by_user.get_mut(&order.creator).unwrap() -= outstanding_spend;
-
+		*self.liquidity_by_price.entry(order.price_per_share).or_insert(0) -= outstanding_spend;
+		
         // Add back to filled if eligible, remove from user map if not
         if order.shares_filled > 0 {
 			self.filled_orders.insert(order.id, order.clone());
         } else {
-            let order_by_user_vec = self.orders_by_user.get_mut(&order.creator).unwrap();
-            order_by_user_vec.swap_remove(order_id.try_into().unwrap());
+			let order_by_user_vec = self.orders_by_user.get_mut(&order.creator).unwrap();
+			
+			// Keep all orders that aren't order_id using the retain method
+            order_by_user_vec.retain(|owned_order_id| &order_id != owned_order_id);
             if order_by_user_vec.is_empty() {
                 self.orders_by_user.remove(&order.creator);
             }
@@ -133,10 +141,13 @@ impl Orderbook {
 				// println!("get here: {:?}, {:?}", order_id, self.open_orders);
                 if amt_of_shares_to_fill > 0 {
                     let shares_remaining_in_order = order.amt_of_shares - order.shares_filled;
-                    let filling = cmp::min(shares_remaining_in_order, amt_of_shares_to_fill);
+					let filling = cmp::min(shares_remaining_in_order, amt_of_shares_to_fill);
+					
+					*self.liquidity_by_price.entry(order.price_per_share).or_insert(0) -= filling * order.price_per_share;
 
                     order.shares_filled += filling;
-                    order.filled += filling * order.price_per_share;
+					order.filled += filling * order.price_per_share;
+
 
                     if order.spend - order.filled < 100 { // some rounding errors here might cause some stack overflow bugs that's why this is build in.
                         to_remove.push((*order_id, order.price_per_share));
@@ -239,7 +250,11 @@ impl Orderbook {
             purchasable -= remaining;
         }
         return depth;
-    }
+	}
+	
+	pub fn get_liquidity_for_price(&self, price: u128) -> u128 {
+		return *self.liquidity_by_price.get(&price).unwrap_or(&0);
+	}
 
     // Returns (max price needed to pay, number of shares to be purchased, total spend)
 	pub fn get_liquidity(&self, spend: u128, max_price: u128) -> (u128, u128, u128) {

@@ -186,6 +186,11 @@ impl Markets {
 		return market.get_liquidity(outcome, spend, price);
 	}
 
+	pub fn get_liquidity_for_price(&self, market_id: u64, outcome: u64, price: u128) -> u128 {
+		let orderbook = self.active_markets.get(&market_id).unwrap().orderbooks.get(&outcome).unwrap();
+		return orderbook.get_liquidity_for_price(price);
+	}
+
 	pub fn get_market(&self, id: u64) -> &Market {
 		let market = self.active_markets.get(&id);
 		return market.unwrap();
@@ -294,5 +299,5 @@ mod tests {
 	mod categorical_market_tests;
 	mod market_resolution_tests;
 	mod claim_earnings_tests;
-	// mod market_depth_tests;
+	mod market_depth_tests;
 }
