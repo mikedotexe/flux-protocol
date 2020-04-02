@@ -7,10 +7,10 @@ fn test_liquidity_for_price() {
 	contract.claim_fdai();
 	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), market_end_timestamp());
 
-	contract.place_order(0, 0, 6000, 50);
-	contract.place_order(0, 0, 6000, 50);
+	contract.place_order(0, 0, 6000, 50); // canceled before fill
+	contract.place_order(0, 0, 6000, 50); // canceled before fill
 	contract.place_order(0, 0, 6000, 20);
-	contract.place_order(0, 0, 8000, 20);
+	contract.place_order(0, 0, 8000, 20); // canceled before fill
 
 	let liquidity_60 = contract.get_liquidity_for_price(0, 0, 60);
 	let liquidity_50 = contract.get_liquidity_for_price(0, 0, 50);
@@ -24,12 +24,19 @@ fn test_liquidity_for_price() {
 	contract.cancel_order(0,0,1);
 	contract.cancel_order(0,0,3);
 
-	// let liquidity_50 = contract.get_liquidity_for_price(0, 0, 50);
-	// let liquidity_20 = contract.get_liquidity_for_price(0, 0, 20);
+	let liquidity_50 = contract.get_liquidity_for_price(0, 0, 50);
+	let liquidity_20 = contract.get_liquidity_for_price(0, 0, 20);
 
-	// assert_eq!(liquidity_50, 0);
-	// assert_eq!(liquidity_20, 6000);
+	assert_eq!(liquidity_50, 0);
+	assert_eq!(liquidity_20, 6000);
 
+	contract.place_order(0, 1, 8000, 80);
+
+	let liquidity_20 = contract.get_liquidity_for_price(0, 0, 20);
+	let liquidity_80 = contract.get_liquidity_for_price(0, 1, 80);
+
+	assert_eq!(liquidity_20, 4000);
+	assert_eq!(liquidity_80, 0);
 }
 
 // #[test]
