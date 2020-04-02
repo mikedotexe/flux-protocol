@@ -39,26 +39,27 @@ fn test_liquidity_for_price() {
 	assert_eq!(liquidity_80, 0);
 }
 
-// #[test]
-// fn test_valid_binary_market_depth() {
-// 	testing_env!(get_context(carol(), current_block_timestamp()));	
-// 	let mut contract = Markets::default();
-// 	contract.claim_fdai();
-// 	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), market_end_timestamp());
-// 	contract.place_order(0, 0, 6000, 60);
-// 	contract.place_order(0, 0, 7000, 70);
+#[test]
+fn test_valid_binary_market_depth() {
+	testing_env!(get_context(carol(), current_block_timestamp()));	
+	let mut contract = Markets::default();
+	contract.claim_fdai();
+	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(), market_end_timestamp());
 
-// 	testing_env!(get_context(alice(), current_block_timestamp()));
-// 	contract.claim_fdai();
-// 	contract.place_order(0, 1, 1000, 20);
-// 	contract.place_order(0, 1, 1000, 10);
+	contract.place_order(0, 0, 2000, 50);
+	contract.place_order(0, 0, 1000, 60);
 
-// 	let depth_0 = contract.get_liquidity(0, 0, 1000, 75); // Returns (max_price_payed, number of shares that can be purached, max_spend at max_price)
-// 	let depth_1 = contract.get_liquidity(0, 1, 1000, 11);
+	testing_env!(get_context(alice(), current_block_timestamp()));
+	contract.claim_fdai();
+	contract.place_order(0, 1, 1000, 20);
+	contract.place_order(0, 1, 2000, 30);
 
-//     assert_eq!(depth_0, (0 , 0, 0));
-// 	assert_eq!(depth_1, (0, 0, 0));
-// }
+	let depth_0 = contract.get_liquidity(0, 2, 10000, 100); // Returns (number of shares that can be purached, max_spend at max_price);
+	// let depth_1 = contract.get_liquidity(0, 1, 1000, 11);
+
+    assert_eq!(depth_0, (0, 0));
+	// assert_eq!(depth_1, (0, 0, 0));
+}
 
 
 // fn test_valid_categorical_market_depth() {

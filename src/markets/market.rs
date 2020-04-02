@@ -73,7 +73,7 @@ impl Market {
 	}
 
 	fn fill_matches(&mut self, outcome: u64, mut spend: u128, price: u128, mut shares_filled: u128) -> (u128, u128) {
-		let market_price = self.get_best_price(outcome);
+		let market_price = self.get_market_price(outcome);
 		let mut shares_to_fill = spend / market_price;
 		if price < market_price || spend < 100 { return (spend, shares_filled); }
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
@@ -121,16 +121,16 @@ impl Market {
 		return shares.unwrap();
 	}
 
-	pub fn get_best_prices(&self) -> BTreeMap<u64, u128> {
+	pub fn get_market_prices(&self) -> BTreeMap<u64, u128> {
 		let mut market_prices: BTreeMap<u64, u128> = BTreeMap::new();
 		for outcome in 0..self.outcomes {
-			let market_price = self.get_best_price(outcome);
+			let market_price = self.get_market_price(outcome);
 			market_prices.insert(outcome, market_price);
 		}
 		return market_prices;
 	}
 
-	pub fn get_best_price(&self, outcome: u64) -> u128 {
+	pub fn get_market_price(&self, outcome: u64) -> u128 {
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		let mut market_price = 100;
 
@@ -187,32 +187,41 @@ impl Market {
 		return claimable;
 	}
 
-	pub fn get_liquidity(&self, outcome: u64, spend: u128, price: u128) -> (u128, u128, u128) {
+	pub fn get_liquidity(&self, outcome: u64, spend: u128, price: u128) -> (u128, u128) {
 		let inverse_orderbook_ids = self.get_inverse_orderbook_ids(outcome);
-		let mut max_price = 100;
+		// Mapped outcome to price and liquidity left
+		let mut outcome_to_price_pointer: HashMap<u64, Option<(u128, u128)>> = HashMap::new();
+
 		let mut max_shares = 0;
-		let mut max_spend = 0;
+		let mut market_price = self.get_market_price(outcome); 
+		let mut best_order_exists = true;
+		while max_shares < spend && market_price <= price && best_order_exists {
+			best_order_exists = false;
 
-		let min_spendable: Option<u128> = None;
-		let min_spendable_ordebook: Option<u128> = None;
-		let min_spenable_price: Option<u64> = None;
+			for orderbook_id in inverse_orderbook_ids {
+				let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
+				// If lowers_liquidity substract from outcome price pointer
+				// if new oucome liquidity equals 0
+					// get difference between next best price and current price and add to market_order
+					// Check if market_order is still < ceiling price.
+				// check if oderbook has best price
+					// If so
+					// set { best_order_exists = true; }
+					// Get best price
+					// Get liquidity for best price
+					// let current_price = outcome_to_price_pointer.entry(outcome).or_insert(orderbook.best_price.unwrap());
+					// check if lower than lowest_liquidity 
+						// if so set lowest liquidity to liquidity
+						// else continue
 
-		let next_market_price = self.get_market_prices();
-		while spend > 0 && next_market_price <= price && !next_market_price.is_none() {
-
-		}
-
-		for orderbook_id in inverse_orderbook_ids {
-			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
-			let best_price = orderbook.best_price.unwrap_or(0);
-			if best_price > 0 {
-				orderbook.get_liquidity_for_price(best_price);
+					// if not remove order from inverse orderbooks? Or add to a skip array.				
 			}
 
 		}
 
-		return (max_price,max_shares,max_spend);
+		return (0, 0);
 	}
+
 
 	pub fn delete_orders_for(&mut self, from: String) {
 		for orderbook_id in 0..self.outcomes {
