@@ -181,6 +181,11 @@ impl Markets {
 		return markets;
 	}
 
+	pub fn get_liquidity(&self, market_id: u64, outcome: u64, spend: u128, price: u128) -> (u128, u128, u128) {
+		let orderbook = self.active_markets.get(&market_id).unwrap().orderbooks.get(&outcome).unwrap();
+		return orderbook.get_liquidity(spend, price);
+	}
+
 	pub fn get_market(&self, id: u64) -> &Market {
 		let market = self.active_markets.get(&id);
 		return market.unwrap();

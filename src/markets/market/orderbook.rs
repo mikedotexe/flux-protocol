@@ -242,15 +242,15 @@ impl Orderbook {
     }
 
     // Returns (max price needed to pay, number of shares to be purchased, total spend)
-	pub fn get_liquidity(&self, spend: u128, max_price_per_share: u128) -> (u128, u128, u128) {
+	pub fn get_liquidity(&self, spend: u128, max_price: u128) -> (u128, u128, u128) {
 	    if self.market_order.is_none() {return (0,0,0)}
 	    let market_price = self.market_order.unwrap();
-	    if market_price > max_price_per_share {return (0,0,0)};
+	    if market_price > max_price {return (0,0,0)};
 
-        let mut max_price_filled = max_price_per_share;
+        let mut max_price_filled = max_price;
         let mut shares = 0;
         let mut filled = 0;
-	    for price_per_share in market_price..max_price_per_share+1 {
+	    for price_per_share in market_price..max_price+1 { // what does the + 1 do?
 	        let depth = self.get_depth(spend - filled, price_per_share);
 	        shares += depth;
 	        filled = cmp::min(depth*price_per_share + filled, spend);
