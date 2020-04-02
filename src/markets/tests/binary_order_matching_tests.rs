@@ -1,10 +1,9 @@
 use super::*;
 #[test]
 fn simplest_binary_order_matching_test() {
-	testing_env!(get_context(carol(), market_creation_timestamp()));
-	let mut contract = Markets::default();
+	testing_env!(get_context(carol(), current_block_timestamp()));	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), market_end_timestamp());
 
 	contract.place_order(0, 0, 5000, 50);
 	contract.place_order(0, 1, 5000, 50);
@@ -20,10 +19,9 @@ fn simplest_binary_order_matching_test() {
 }
 
 fn partial_binary_order_matching_test() {
-	testing_env!(get_context(carol(), market_creation_timestamp()));
-	let mut contract = Markets::default();
+	testing_env!(get_context(carol(), current_block_timestamp()));	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), 100010101001010);
+	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), market_end_timestamp());
 
 	contract.place_order(0, 0, 5000, 50);
 	contract.place_order(0, 1, 5000, 50);

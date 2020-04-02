@@ -256,10 +256,12 @@ mod tests {
 		return outcomes;
 	}
 
-	fn market_creation_timestamp() -> u64 {
+	fn current_block_timestamp() -> u64 {
 		return 123789;
 	}
-
+	fn market_end_timestamp() -> u64 {
+		return current_block_timestamp() + 1;
+	}
 
 	fn get_context(predecessor_account_id: String, block_timestamp: u64) -> VMContext {
 		VMContext {

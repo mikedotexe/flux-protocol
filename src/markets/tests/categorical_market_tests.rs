@@ -2,8 +2,7 @@ use super::*;
 
 #[test]
 fn test_categorical_market_matches() {
-	testing_env!(get_context(carol(), market_creation_timestamp()));
-	let mut contract = Markets::default();
+	testing_env!(get_context(carol(), current_block_timestamp()));	let mut contract = Markets::default();
 	contract.claim_fdai();
 	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(), 100010101001010);
 
