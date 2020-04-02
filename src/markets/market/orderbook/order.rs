@@ -28,11 +28,4 @@ impl Order {
 			shares_filled,
 		}
 	}
-
-	pub fn is_better_price_than(&self, compare_order: Order) -> bool {
-		if self.price > compare_order.price {
-			return true;
-		} 
-		return false;
-	}
 }
