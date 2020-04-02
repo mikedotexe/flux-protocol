@@ -12,9 +12,6 @@ pub struct Order {
 	pub price: u128,
 	pub filled: u128,
 	pub shares_filled: u128,
-	pub parent: Option<u128>,
-	pub better_order_id: Option<u128>,
-	pub worse_order_id: Option<u128>,
 }
 
 
@@ -29,9 +26,6 @@ impl Order {
 			price,
 			filled,
 			shares_filled,
-			parent: None,
-			better_order_id: None,
-			worse_order_id: None,
 		}
 	}
 
