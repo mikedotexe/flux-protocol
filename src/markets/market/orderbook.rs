@@ -66,7 +66,7 @@ impl Orderbook {
 		let orders_at_price = self.orders_by_price.entry(price_per_share).or_insert(HashMap::new());
 		orders_at_price.insert(order_id, true);
 
-		
+
 		self.orders_by_user.entry(from.to_string()).or_insert(Vec::new()).push(order_id);
 	}
 
@@ -176,7 +176,7 @@ impl Orderbook {
 
 	// TODO: shouldn't be deleted but maybe flagged claimed - this way we can retain an order history
 	pub fn delete_orders_for(&mut self, from: String) {
-	    let mut to_delete : Vec<u128> = vec![];		
+	    let mut to_delete : Vec<u128> = vec![];
 		let mut empty_vec = &mut vec![];
         *self.orders_by_user.get_mut(&from).unwrap_or(empty_vec) = vec![];
 	}
@@ -201,7 +201,7 @@ impl Orderbook {
 		let mut claimable = 0;
 		let empty_vec: Vec<u128> = vec![];
 		let orders_by_user_vec = self.orders_by_user.get(&from).unwrap_or(&empty_vec);
-		
+
         for i in 0..orders_by_user_vec.len() {
 			let order_id = orders_by_user_vec[i];
 			let open_order_prom = self.open_orders.get(&order_id);
@@ -216,5 +216,46 @@ impl Orderbook {
 
 	pub fn get_spend_by(&self, from: String) -> u128 {
 		return *self.spend_by_user.get(&from).unwrap_or(&0);
+	}
+
+    pub fn get_depth(&self, spend: u128, price_per_share: u128) -> u128 {
+        if self.orders_by_price.get(&price_per_share).is_none() {return 0};
+        let orders_map = self.orders_by_price.get(&price_per_share).unwrap();
+
+        let mut depth = 0;
+        let mut purchasable = spend / price_per_share;
+        for (order_id, _) in orders_map.iter() {
+            if self.open_orders.get(&order_id).is_none() {continue};
+            let order = self.open_orders.get(&order_id).unwrap();
+            let remaining = order.amt_of_shares - order.shares_filled;
+            if remaining >= purchasable {
+                depth += purchasable;
+                return depth;
+            }
+            depth += remaining;
+            purchasable -= remaining;
+        }
+        return depth;
+    }
+
+    // Returns (max price needed to pay, number of shares to be purchased, total spend)
+	pub fn get_liquidity(&self, spend: u128, max_price_per_share: u128) -> (u128, u128, u128) {
+	    if self.market_order.is_none() {return (0,0,0)}
+	    let market_price = self.market_order.unwrap();
+	    if market_price > max_price_per_share {return (0,0,0)};
+
+        let mut max_price_filled = max_price_per_share;
+        let mut shares = 0;
+        let mut filled = 0;
+	    for price_per_share in market_price..max_price_per_share+1 {
+	        let depth = self.get_depth(spend - filled, price_per_share);
+	        shares += depth;
+	        filled = cmp::min(depth*price_per_share + filled, spend);
+	        if depth > 0 {max_price_filled = price_per_share};
+            if spend - filled <= 100 {
+                return (max_price_filled, shares, filled)
+            }
+	    }
+	    return (max_price_filled, shares, filled);
 	}
 }

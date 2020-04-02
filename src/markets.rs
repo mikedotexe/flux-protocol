@@ -45,7 +45,7 @@ impl Markets {
 		let from = env::predecessor_account_id();
 		let can_claim = self.fdai_balances.get(&from).is_none();
 		assert!(can_claim, "user has already claimed fdai");
-		
+
 		let claim_amount = 100 * self.dai_token();
 		self.fdai_balances.insert(from, claim_amount);
 
@@ -85,7 +85,7 @@ impl Markets {
 		let from = env::predecessor_account_id();
 		let balance = self.fdai_balances.get(&from).unwrap();
 		assert!(balance >= &spend);
-		
+
 		let amount_of_shares = spend / price_per_share;
 		let rounded_spend = amount_of_shares * price_per_share;
 		let market = self.active_markets.get_mut(&market_id).unwrap();
@@ -137,7 +137,7 @@ impl Markets {
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 		return &orderbook.open_orders;
 	}
-	
+
 	pub fn get_filled_orders(&self, market_id: u64, outcome: u64) -> &HashMap<u128, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
@@ -151,18 +151,18 @@ impl Markets {
 	pub fn claim_earnings(&mut self, market_id: u64, account_id: String) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, true);
-		
+
 		let claimable = market.get_claimable(account_id.to_string());
 		market.delete_orders_for(account_id.to_string());
 
 		self.add_balance(claimable);
 	}
 
-	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> { 
+	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> {
 		return &self.active_markets;
 	}
 
-	pub fn get_markets_by_id(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> { 
+	pub fn get_markets_by_id(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> {
 		let mut markets = BTreeMap::new();
 		for market_id in market_ids {
 			markets.insert(market_id, self.active_markets.get(&market_id).unwrap());
@@ -170,7 +170,7 @@ impl Markets {
 		return markets;
 	}
 
-	pub fn get_specific_markets(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> { 
+	pub fn get_specific_markets(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> {
 		let mut markets = BTreeMap::new();
 		for market_id in 0..market_ids.len() {
 			markets.insert(market_id as u64, self.active_markets.get(&(market_id as u64)).unwrap());
@@ -209,7 +209,7 @@ impl Default for Markets {
 			creator: "flux-dev".to_string(),
 			active_markets: BTreeMap::new(),
 			nonce: 0,
-			fdai_balances: HashMap::new(),	
+			fdai_balances: HashMap::new(),
 			fdai_circulation: 0,
 			fdai_in_protocol: 0,
 			fdai_outside_escrow: 0,
@@ -227,15 +227,15 @@ mod tests {
 
 	fn alice() -> String {
 		return "alice.near".to_string();
-	} 
+	}
 
 	fn carol() -> String {
 		return "carol.near".to_string();
-	} 
+	}
 
 	fn bob() -> String {
 		return "bob.near".to_string();
-	} 
+	}
 
 	fn empty_string() -> String {
 		return "".to_string();
@@ -280,4 +280,5 @@ mod tests {
 	mod categorical_market_tests;
 	mod market_resolution_tests;
 	mod claim_earnings_tests;
+	mod market_depth_tests;
 }
