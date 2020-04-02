@@ -1,7 +1,7 @@
 use std::string::String;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use near_bindgen::{near_bindgen};
+use near_bindgen::{near_bindgen, env};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +24,7 @@ pub struct Market {
 	pub outcome_tags: Vec<String>,
 	pub categories: Vec<String>,
 	pub last_price_for_outcomes: HashMap<u64, u128>,
-	// creation_time: u128
+	pub creation_time: u64,
 	pub end_time: u64,
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub winning_outcome: Option<u64>,
@@ -50,6 +50,7 @@ impl Market {
 			outcome_tags,
 			categories,
 			last_price_for_outcomes: HashMap::new(),
+			creation_time: env::block_timestamp(),
 			end_time,
 			orderbooks: empty_orderbooks,
 			winning_outcome: None,
@@ -62,6 +63,7 @@ impl Market {
 		assert!(spend > 0);
 		assert!(price_per_share > 0 && price_per_share < 100);
 		assert_eq!(self.resoluted, false);
+		assert!(env::block_timestamp() < self.end_time);
 		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price_per_share, 0);
 		let total_spend = spend - spend_filled;
 		self.liquidity += spend;
@@ -157,6 +159,7 @@ impl Market {
 
 	pub fn resolute(&mut self,from: String, winning_outcome: Option<u64>) {
 		// TODO: Make sure market can only be resoluted after end time
+		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false);
 		assert_eq!(from, self.creator);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
@@ -166,6 +169,7 @@ impl Market {
 	
 	pub fn get_claimable(&self, from: String) -> u128 {
 		assert_eq!(self.resoluted, true);
+		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 

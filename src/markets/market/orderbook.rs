@@ -18,6 +18,7 @@ pub struct Orderbook {
 	pub spend_by_user: HashMap<String, u128>,
 	pub orders_by_price: BTreeMap<u128, HashMap<u128, bool>>,
 	pub orders_by_user: HashMap<String, Vec<u128>>,
+	pub claimed_orders_by_user: HashMap<String, Vec<u128>>,
 	pub nonce: u128,
 	pub outcome_id: u64
 }
@@ -30,6 +31,7 @@ impl Orderbook {
 			spend_by_user: HashMap::new(),
 			orders_by_price: BTreeMap::new(),
 			orders_by_user: HashMap::new(),
+			claimed_orders_by_user: HashMap::new(),
 			market_order: None,
 			nonce: 0,
 			outcome_id: outcome,
@@ -178,6 +180,8 @@ impl Orderbook {
 	pub fn delete_orders_for(&mut self, from: String) {
 	    let mut to_delete : Vec<u128> = vec![];
 		let mut empty_vec = &mut vec![];
+		let orders_by_user_copy = self.orders_by_user.get(&from).unwrap().clone();
+		self.claimed_orders_by_user.insert(from.to_string(), orders_by_user_copy);
         *self.orders_by_user.get_mut(&from).unwrap_or(empty_vec) = vec![];
 	}
 
