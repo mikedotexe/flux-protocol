@@ -46,18 +46,17 @@ fn test_valid_binary_market_depth() {
 	contract.claim_fdai();
 	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(), market_end_timestamp());
 
-	contract.place_order(0, 0, 2000, 50);
-	contract.place_order(0, 0, 1000, 60);
+	contract.place_order(0, 0, 5000, 50);
+	contract.place_order(0, 0, 6000, 60);
 
 	testing_env!(get_context(alice(), current_block_timestamp()));
 	contract.claim_fdai();
-	contract.place_order(0, 1, 1000, 20);
-	contract.place_order(0, 1, 2000, 30);
-
-	let depth_0 = contract.get_liquidity(0, 2, 10000, 100); // Returns (number of shares that can be purached, max_spend at max_price);
+	contract.place_order(0, 1, 2000, 20);
+	contract.place_order(0, 1, 3000, 30);
+	let depth_0 = contract.get_liquidity(0, 2, 10000, 100); 
 	// let depth_1 = contract.get_liquidity(0, 1, 1000, 11);
 
-    assert_eq!(depth_0, (0, 0));
+    assert_eq!(depth_0, 4000);
 	// assert_eq!(depth_1, (0, 0, 0));
 }
 

@@ -187,17 +187,23 @@ impl Market {
 		return claimable;
 	}
 
-	pub fn get_liquidity(&self, outcome: u64, spend: u128, price: u128) -> (u128, u128) {
+	pub fn get_liquidity(&self, outcome: u64, spend: u128, price: u128) -> u128 {
 		let inverse_orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		// Mapped outcome to price and liquidity left
 		let mut outcome_to_price_liq_pointer: HashMap<u64,  (u128, u128)> = HashMap::new();
 
-		let mut max_shares = 0;
+		let mut max_spend = 0;
 		let mut market_price = self.get_market_price(outcome); 
 		let mut best_order_exists = true;
 		let mut lowest_liquidity = 0;
 
-		while max_shares < spend && market_price <= price && best_order_exists {
+		// Debugging
+		for orderbook_id in &inverse_orderbook_ids {
+			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
+			println!("liquidity per price: {:?}", orderbook.liquidity_by_price);
+		}	
+
+		while max_spend < spend && market_price <= price && best_order_exists {
 			best_order_exists = false;
 
 			for orderbook_id in &inverse_orderbook_ids {
@@ -212,6 +218,7 @@ impl Market {
 						// get next best price
 						let next_best_price = orderbook.orders_by_price.range(..last_iteration_price_liquidity.0).next();
 						if next_best_price.is_none() { continue; }
+						best_order_exists = true;
 						let add_to_market_price =  last_iteration_price_liquidity.0 - *next_best_price.unwrap().0;
 						market_price += add_to_market_price;
 						outcome_to_price_liq_pointer.insert(*orderbook_id, (*next_best_price.unwrap().0, orderbook.get_liquidity_for_price(*next_best_price.unwrap().0)));
@@ -229,6 +236,7 @@ impl Market {
 					if first_iteration {
 						let price = orderbook.best_price;
 						if price.is_none() {continue}
+						best_order_exists = true;
 						let liquidity = orderbook.get_liquidity_for_price(price.unwrap());
 						outcome_to_price_liq_pointer.insert(*orderbook_id, (price.unwrap(), liquidity));
 					}
@@ -238,12 +246,13 @@ impl Market {
 					if lowest_liquidity == 0 {lowest_liquidity = liquidity}
 					else if lowest_liquidity > liquidity { lowest_liquidity = liquidity}
 				}
-				max_shares += lowest_liquidity;
+				println!("lowest liquidity: {}", lowest_liquidity);
+				max_spend += lowest_liquidity;
 			}
 
 		}
 
-		return (0, 0);
+		return max_spend;
 	}
 
 
