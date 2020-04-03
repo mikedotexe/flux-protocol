@@ -181,8 +181,8 @@ impl Markets {
 		return markets;
 	}
 
-	pub fn get_liquidity(&self, market_id: u64, outcome: u64, spend: u128, price: u128) -> u128 {
-		let market = self.active_markets.get(&market_id).unwrap();
+	pub fn get_liquidity(&mut self, market_id: u64, outcome: u64, spend: u128, price: u128) -> u128 {
+		let mut market = self.active_markets.get_mut(&market_id).unwrap();
 		return market.get_liquidity(outcome, spend, price);
 	}
 

@@ -83,7 +83,7 @@ impl Market {
 		if shares_fillable < shares_to_fill {
 			shares_to_fill = shares_fillable;
 		}
-		
+
 
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
@@ -104,7 +104,7 @@ impl Market {
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
-			
+
             if let Some((best_price, best_order_map)) = orderbook.orders_by_price.iter().next() {
                 let mut left_to_fill = 0;
                 let mut shares_to_fill = 0;
@@ -166,7 +166,7 @@ impl Market {
 		self.winning_outcome = winning_outcome;
 		self.resoluted = true;
 	}
-	
+
 	pub fn get_claimable(&self, from: String) -> u128 {
 		assert_eq!(self.resoluted, true);
 		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
@@ -187,63 +187,75 @@ impl Market {
 		return claimable;
 	}
 
-	pub fn get_liquidity(&self, outcome: u64, spend: u128, price: u128) -> u128 {
+    // Updates the best price for an order once initial best price is filled
+	fn update_next_best_price(&mut self, inverse_orderbook_ids: &Vec<u64>, first_iteration: &bool, outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, best_order_exists: &mut bool, market_price: &mut u128, lowest_liquidity: &u128) {
+	    for orderbook_id in inverse_orderbook_ids {
+            let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
+            if !first_iteration {
+                if outcome_to_price_share_pointer.get_mut(orderbook_id).is_none() {continue}
+                outcome_to_price_share_pointer.get_mut(orderbook_id).unwrap().1 -= lowest_liquidity;
+                let price_liquidity = outcome_to_price_share_pointer.get(orderbook_id).unwrap();
+                let liquidity = price_liquidity.1;
+
+                if liquidity == 0 {
+                    // get next best price
+                    let next_best_price_prom = orderbook.orders_by_price.range(0..price_liquidity.0 - 1).next();
+
+                    if next_best_price_prom.is_none() {
+                        outcome_to_price_share_pointer.remove(orderbook_id);
+                        continue;
+                    }
+                    *best_order_exists = true;
+                    let next_best_price = *next_best_price_prom.unwrap().0;
+                    let add_to_market_price =  price_liquidity.0 - next_best_price;
+                    *market_price += add_to_market_price;
+                    outcome_to_price_share_pointer.insert(*orderbook_id, (next_best_price, orderbook.get_liquidity_for_price(next_best_price)));
+                }
+            }
+        }
+	}
+
+    // Updates the lowest liquidity available amongst best prices
+	fn update_lowest_liquidity(&mut self, inverse_orderbook_ids: &Vec<u64>, first_iteration: &bool, lowest_liquidity: &mut u128, outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, best_order_exists: &mut bool) {
+	    *best_order_exists = false;
+	    for orderbook_id in inverse_orderbook_ids {
+            // Get lowest liquidity at new price
+            let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
+            if *first_iteration {
+                let price = orderbook.best_price;
+                if price.is_none() {continue}
+                *best_order_exists = true;
+                let liquidity = orderbook.get_liquidity_for_price(price.unwrap());
+                outcome_to_price_share_pointer.insert(*orderbook_id, (price.unwrap(), liquidity));
+            }
+            if outcome_to_price_share_pointer.get(orderbook_id).is_none() {continue}
+            let liquidity = outcome_to_price_share_pointer.get(orderbook_id).unwrap().1;
+            if *lowest_liquidity == 0 {*lowest_liquidity = liquidity}
+            else if *lowest_liquidity > liquidity { *lowest_liquidity = liquidity}
+
+        }
+
+	}
+
+	pub fn get_liquidity(&mut self, outcome: u64, spend: u128, price: u128) -> u128 {
 		let inverse_orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		// Mapped outcome to price and liquidity left
 		let mut outcome_to_price_share_pointer: HashMap<u64,  (u128, u128)> = HashMap::new();
 		let mut max_spend = 0;
 		let mut max_shares = 0;
-		let mut market_price = self.get_market_price(outcome); 
+		let mut market_price = self.get_market_price(outcome);
 		let mut best_order_exists = true;
 		let mut lowest_liquidity = 0;
 		let mut first_iteration = true;
 
 		while max_spend < spend && market_price <= price && best_order_exists {
-			best_order_exists = false;
-			for orderbook_id in &inverse_orderbook_ids {
-				let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
-				if !first_iteration {
-					if outcome_to_price_share_pointer.get_mut(orderbook_id).is_none() {continue}
-					outcome_to_price_share_pointer.get_mut(orderbook_id).unwrap().1 -= lowest_liquidity;
-					let price_liquidity = outcome_to_price_share_pointer.get(orderbook_id).unwrap();
-					let liquidity = price_liquidity.1;
-					
-					if liquidity == 0 {
-						// get next best price
-						let next_best_price_prom = orderbook.orders_by_price.range(0..price_liquidity.0 - 1).next();
-						
-						if next_best_price_prom.is_none() {
-							outcome_to_price_share_pointer.remove(orderbook_id);
-							continue; 
-						} 
-						best_order_exists = true;
-						let next_best_price = *next_best_price_prom.unwrap().0;
-						let add_to_market_price =  price_liquidity.0 - next_best_price;
-						market_price += add_to_market_price;
-						outcome_to_price_share_pointer.insert(*orderbook_id, (next_best_price, orderbook.get_liquidity_for_price(next_best_price)));
-						
-					}
-				}
-			}
+			self.update_next_best_price(&inverse_orderbook_ids, &first_iteration, &mut outcome_to_price_share_pointer,
+			                            &mut best_order_exists, &mut market_price, &lowest_liquidity);
 
 			lowest_liquidity = 0;
-
 			if market_price <= price {
-				for orderbook_id in &inverse_orderbook_ids {
-					let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
-					if first_iteration {
-						let price = orderbook.best_price;
-						if price.is_none() {continue}
-						best_order_exists = true;
-						let liquidity = orderbook.get_liquidity_for_price(price.unwrap());
-						outcome_to_price_share_pointer.insert(*orderbook_id, (price.unwrap(), liquidity));
-					}
-					if outcome_to_price_share_pointer.get(orderbook_id).is_none() {continue}
-					let liquidity = outcome_to_price_share_pointer.get(orderbook_id).unwrap().1;
-					if lowest_liquidity == 0 {lowest_liquidity = liquidity}
-					else if lowest_liquidity > liquidity { lowest_liquidity = liquidity}
-	
-				}
+				self.update_lowest_liquidity(&inverse_orderbook_ids, &first_iteration, &mut lowest_liquidity,
+				                             &mut outcome_to_price_share_pointer, &mut best_order_exists);
 				max_spend += lowest_liquidity * market_price;
 				max_shares += lowest_liquidity;
 			}
