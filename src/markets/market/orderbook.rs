@@ -253,7 +253,12 @@ impl Orderbook {
 	}
 	
 	pub fn get_liquidity_for_price(&self, price: u128) -> u128 {
-		return *self.liquidity_by_price.get(&price).unwrap_or(&0);
+		let spend_liquidity = *self.liquidity_by_price.get(&price).unwrap_or(&0);
+		if spend_liquidity == 0 {
+			return 0
+		} else {
+			return spend_liquidity / price;
+		}
 	}
 
     // Returns (max price needed to pay, number of shares to be purchased, total spend)

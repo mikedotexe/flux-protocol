@@ -220,7 +220,7 @@ impl Market {
 						let next_best_price = *next_best_price_prom.unwrap().0;
 						let add_to_market_price =  price_liquidity.0 - next_best_price;
 						market_price += add_to_market_price;
-						outcome_to_price_share_pointer.insert(*orderbook_id, (next_best_price, orderbook.get_liquidity_for_price(next_best_price) / next_best_price));
+						outcome_to_price_share_pointer.insert(*orderbook_id, (next_best_price, orderbook.get_liquidity_for_price(next_best_price)));
 						
 					}
 				}
@@ -235,8 +235,8 @@ impl Market {
 						let price = orderbook.best_price;
 						if price.is_none() {continue}
 						best_order_exists = true;
-						let spendable = orderbook.get_liquidity_for_price(price.unwrap());
-						outcome_to_price_share_pointer.insert(*orderbook_id, (price.unwrap(), spendable / price.unwrap()));
+						let liquidity = orderbook.get_liquidity_for_price(price.unwrap());
+						outcome_to_price_share_pointer.insert(*orderbook_id, (price.unwrap(), liquidity));
 					}
 					if outcome_to_price_share_pointer.get(orderbook_id).is_none() {continue}
 					let liquidity = outcome_to_price_share_pointer.get(orderbook_id).unwrap().1;
