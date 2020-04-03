@@ -249,13 +249,20 @@ impl Market {
 		let mut first_iteration = true;
 
 		while max_spend < spend && market_price <= price && best_order_exists {
-			self.update_next_best_price(&inverse_orderbook_ids, &first_iteration, &mut outcome_to_price_share_pointer,
-			                            &mut best_order_exists, &mut market_price, &lowest_liquidity);
+			self.update_next_best_price(&inverse_orderbook_ids,
+			&first_iteration,
+			&mut outcome_to_price_share_pointer,
+			&mut best_order_exists,
+			&mut market_price,
+			&lowest_liquidity);
 
 			lowest_liquidity = 0;
 			if market_price <= price {
-				self.update_lowest_liquidity(&inverse_orderbook_ids, &first_iteration, &mut lowest_liquidity,
-				                             &mut outcome_to_price_share_pointer, &mut best_order_exists);
+				self.update_lowest_liquidity(&inverse_orderbook_ids,
+				&first_iteration,
+				&mut lowest_liquidity,
+                &mut outcome_to_price_share_pointer,
+                &mut best_order_exists);
 				max_spend += lowest_liquidity * market_price;
 				max_shares += lowest_liquidity;
 			}
