@@ -231,26 +231,6 @@ impl Orderbook {
 	pub fn get_spend_by(&self, from: String) -> u128 {
 		return *self.spend_by_user.get(&from).unwrap_or(&0);
 	}
-
-    pub fn get_depth(&self, spend: u128, price: u128) -> u128 {
-        if self.orders_by_price.get(&price).is_none() {return 0};
-        let orders_map = self.orders_by_price.get(&price).unwrap();
-
-        let mut depth = 0;
-        let mut purchasable = spend / price;
-        for (order_id, _) in orders_map.iter() {
-            if self.open_orders.get(&order_id).is_none() {continue};
-            let order = self.open_orders.get(&order_id).unwrap();
-            let remaining = order.amt_of_shares - order.shares_filled;
-            if remaining >= purchasable {
-                depth += purchasable;
-                return depth;
-            }
-            depth += remaining;
-            purchasable -= remaining;
-        }
-        return depth;
-	}
 	
 	pub fn get_liquidity_for_price(&self, price: u128) -> u128 {
 		let spend_liquidity = *self.liquidity_by_price.get(&price).unwrap_or(&0);
@@ -259,26 +239,5 @@ impl Orderbook {
 		} else {
 			return spend_liquidity / price;
 		}
-	}
-
-    // Returns (max price needed to pay, number of shares to be purchased, total spend)
-	pub fn get_liquidity(&self, spend: u128, max_price: u128) -> (u128, u128, u128) {
-	    if self.best_price.is_none() {return (0,0,0)}
-	    let market_price = self.best_price.unwrap();
-	    if market_price > max_price {return (0,0,0)};
-
-        let mut max_price_filled = max_price;
-        let mut shares = 0;
-        let mut filled = 0;
-	    for price in market_price..max_price+1 { // what does the + 1 do?
-	        let depth = self.get_depth(spend - filled, price);
-	        shares += depth;
-	        filled = cmp::min(depth*price + filled, spend);
-	        if depth > 0 {max_price_filled = price};
-            if spend - filled <= 100 {
-                return (max_price_filled, shares, filled)
-            }
-	    }
-	    return (max_price_filled, shares, filled);
 	}
 }
