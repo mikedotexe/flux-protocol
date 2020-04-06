@@ -54,7 +54,7 @@ impl Orderbook {
 		*self.spend_by_user.entry(from.to_string()).or_insert(0) += spend;
 
         // If all of spend is filled, state order is fully filled
-        let left_to_spend = spend - filled;
+		let left_to_spend = spend - filled;
 		if left_to_spend < 100 {
 			self.filled_orders.insert(price, new_order);
 			return;

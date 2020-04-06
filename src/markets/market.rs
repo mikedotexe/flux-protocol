@@ -64,37 +64,46 @@ impl Market {
 		assert!(price > 0 && price < 100);
 		assert_eq!(self.resoluted, false);
 		assert!(env::block_timestamp() < self.end_time);
-		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price, 0);
-		let total_spend = spend - spend_filled;
+
+		let (spend_left, shares_filled) = self.fill_matches(outcome, spend, price);
+		let total_spend = spend_left;
 		self.liquidity += spend;
 		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
 	}
 
-	fn fill_matches(&mut self, outcome: u64, mut spend: u128, price: u128, mut shares_filled: u128) -> (u128, u128) {
-		let market_price = self.get_market_price(outcome);
-		let mut shares_to_fill = spend / market_price;
-		if price < market_price || spend < 100 { return (spend, shares_filled); }
+	fn fill_matches(&mut self, outcome: u64, spend: u128, price: u128) -> (u128, u128) {
+		let mut market_price = self.get_market_price(outcome);
+		if market_price > price { return (0,0) }
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
-		let shares_fillable = self.get_min_shares_fillable(outcome);
-		self.last_price_for_outcomes.insert(outcome, market_price);
-
-		if shares_fillable < shares_to_fill {
-			shares_to_fill = shares_fillable;
-		}
-
-
-		for orderbook_id in orderbook_ids {
-			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
-			if !orderbook.best_price.is_none() {
-				let best_price = orderbook.get_best_price();
-				self.last_price_for_outcomes.insert(orderbook_id, best_price);
-				orderbook.fill_best_orders(shares_to_fill);
+		
+		let mut shares_filled = 0;
+		let mut spendable = spend;
+		
+		while spendable > 100 && market_price <= price {
+			let mut shares_to_fill = spendable / market_price;
+			let shares_fillable = self.get_min_shares_fillable(outcome);
+			self.last_price_for_outcomes.insert(outcome, market_price);
+			
+			if shares_fillable < shares_to_fill {
+				shares_to_fill = shares_fillable;
 			}
+			
+			for orderbook_id in &orderbook_ids {
+				let orderbook = self.orderbooks.get_mut(orderbook_id).unwrap();
+				if !orderbook.best_price.is_none() {
+					let best_price = orderbook.get_best_price();
+					self.last_price_for_outcomes.insert(*orderbook_id, best_price);
+					orderbook.fill_best_orders(shares_to_fill);
+				}
+			}
+			
+			spendable -= shares_to_fill * market_price;
+			shares_filled += shares_to_fill;
+			market_price = self.get_market_price(outcome);
 		}
-		spend -= shares_to_fill * market_price;
-		shares_filled += shares_to_fill;
+
 
 		return (spend, shares_filled);
 	}
