@@ -66,7 +66,7 @@ impl Market {
 		assert!(env::block_timestamp() < self.end_time);
 
 		let (spend_left, shares_filled) = self.fill_matches(outcome, spend, price);
-		let total_spend = spend_left;
+		let total_spend = spend - spend_left;
 		self.liquidity += spend;
 		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
@@ -75,12 +75,12 @@ impl Market {
 
 	fn fill_matches(&mut self, outcome: u64, spend: u128, price: u128) -> (u128, u128) {
 		let mut market_price = self.get_market_price(outcome);
-		if market_price > price { return (0,0) }
+		if market_price > price { return (spend,0) }
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		
 		let mut shares_filled = 0;
 		let mut spendable = spend;
-		
+
 		while spendable > 100 && market_price <= price {
 			let mut shares_to_fill = spendable / market_price;
 			let shares_fillable = self.get_min_shares_fillable(outcome);
@@ -104,8 +104,7 @@ impl Market {
 			market_price = self.get_market_price(outcome);
 		}
 
-
-		return (spend, shares_filled);
+		return (spendable, shares_filled);
 	}
 
 	pub fn get_min_shares_fillable(&self, outcome: u64) -> u128 {
@@ -113,19 +112,10 @@ impl Market {
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
-
-            if let Some((best_price, best_order_map)) = orderbook.orders_by_price.iter().next() {
-                let mut left_to_fill = 0;
-                let mut shares_to_fill = 0;
-                for (order_id, _) in best_order_map.iter() {
-					let order = orderbook.open_orders.get(&order_id).unwrap();
-                    left_to_fill += order.spend - order.filled;
-                    shares_to_fill += left_to_fill / best_price;
-                }
-                if shares.is_none() || shares_to_fill < shares.unwrap() {
-                    shares = Some(shares_to_fill);
-                }
-            }
+			if !orderbook.best_price.is_none() {
+				let best_price_liquidity = orderbook.get_liquidity_for_price(orderbook.best_price.unwrap());
+				if shares.is_none() || shares.unwrap() > best_price_liquidity {shares = Some(best_price_liquidity)}
+			}
 		}
 		return shares.unwrap();
 	}

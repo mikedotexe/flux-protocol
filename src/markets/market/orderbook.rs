@@ -72,7 +72,6 @@ impl Orderbook {
 		
 		orders_at_price.insert(order_id, true);
 
-
 		self.orders_by_user.entry(from.to_string()).or_insert(Vec::new()).push(order_id);
 	}
 
