@@ -1,0 +1,1 @@
+near deploy --accountId flux-protocol-alpha --nodeUrl "http://localhost:3030" --wasmFile ./res/flux_protocol.wasm

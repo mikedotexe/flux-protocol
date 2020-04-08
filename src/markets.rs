@@ -2,6 +2,9 @@ use near_bindgen::{near_bindgen, env};
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::collections::{BTreeMap, HashMap};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+
+const SINGLE_CALL_GAS: u64 = 90000000000000;
 
 mod market;
 type Market = market::Market;
@@ -13,15 +16,58 @@ struct Markets {
 	creator: String,
 	active_markets: BTreeMap<u64, Market>,
 	nonce: u64,
-	fdai_balances: HashMap<String, u128>, // Denominated in 1e18
-	fdai_circulation: u128,
-	fdai_in_protocol: u128,
-	fdai_outside_escrow: u128,
+	fdai_address: String,
 	user_count: u64
 }
 
 #[near_bindgen]
 impl Markets {
+	
+	pub fn claim_fdai(&self) {
+		let from = env::predecessor_account_id();
+
+        let promise1 = env::promise_create(
+            self.fdai_address.clone(),
+            b"claim_fdai",
+            json!({ "account_id": from }).to_string().as_bytes(),
+            0,
+            SINGLE_CALL_GAS,
+        );
+        env::promise_return(promise1);
+	}
+	
+	pub fn get_fdai_balance(&self, account_id: String) {
+        let promise1 = env::promise_create(
+            self.fdai_address.clone(),
+            b"get_balance",
+            json!({ "from": account_id }).to_string().as_bytes(),
+            0,
+            SINGLE_CALL_GAS,
+        );
+        env::promise_return(promise1);
+	}
+	
+	pub fn get_and_set_fdai(&self, account_id: String) {
+
+		let promise0 = env::promise_create(
+            self.fdai_address.clone(),
+            b"claim_fdai",
+            json!({ "account_id": account_id }).to_string().as_bytes(),
+            0,
+            SINGLE_CALL_GAS,
+		);
+		
+        let promise1 = env::promise_then(
+			promise0,
+            self.fdai_address.clone(),
+            b"get_balance",
+            json!({ "account_id": account_id }).to_string().as_bytes(),
+            0,
+            0,
+		);
+		
+        env::promise_return(promise1);
+    }
 
 	fn dai_token(&self) -> u128 {
 		let base: u128 = 10;
@@ -33,32 +79,32 @@ impl Markets {
 		let from = env::predecessor_account_id();
 		assert_eq!(from, self.creator);
 
-		*self.fdai_balances.get_mut(&from).unwrap() += amount;
+		// *self.fdai_balances.get_mut(&from).unwrap() += amount;
 
-		// Monitoring total supply - just for testnet
-		self.fdai_circulation = self.fdai_circulation + amount as u128;
-		self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
+		// // Monitoring total supply - just for testnet
+		// self.fdai_circulation = self.fdai_circulation + amount as u128;
+		// self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
 	}
 
 	// This is a demo method, it mints a currency to interact with markets until we have NDAI
-	pub fn claim_fdai(&mut self) -> bool{
-		let from = env::predecessor_account_id();
-		let can_claim = self.fdai_balances.get(&from).is_none();
-		assert!(can_claim, "user has already claimed fdai");
+	// pub fn claim_fdai(&mut self) -> bool{
+	// 	let from = env::predecessor_account_id();
+	// 	let can_claim = self.fdai_balances.get(&from).is_none();
+	// 	assert!(can_claim, "user has already claimed fdai");
 
-		let claim_amount = 100 * self.dai_token();
-		self.fdai_balances.insert(from, claim_amount);
+	// 	let claim_amount = 100 * self.dai_token();
+	// 	self.fdai_balances.insert(from, claim_amount);
 
-		// Monitoring total supply - just for testnet
-		self.fdai_circulation = self.fdai_circulation + claim_amount as u128;
-		self.fdai_outside_escrow = self.fdai_outside_escrow + claim_amount as u128;
-		self.user_count = self.user_count + 1;
-		return true;
-	}
+	// 	// Monitoring total supply - just for testnet
+	// 	self.fdai_circulation = self.fdai_circulation + claim_amount as u128;
+	// 	self.fdai_outside_escrow = self.fdai_outside_escrow + claim_amount as u128;
+	// 	self.user_count = self.user_count + 1;
+	// 	return true;
+	// }
 
-	pub fn get_fdai_balance(&self, from: String) -> u128 {
-		return *self.fdai_balances.get(&from).unwrap();
-	}
+	// pub fn get_fdai_balance(&self, from: String) -> u128 {
+	// 	return *self.fdai_balances.get(&from).unwrap();
+	// }
 
 	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> u64 {
 		assert!(outcomes > 1);
@@ -83,18 +129,18 @@ impl Markets {
 		self.active_markets.remove(&market_id);
 	}
 
-	pub fn place_order(&mut self, market_id: u64, outcome: u64, spend: u128, price: u128) {
-		let from = env::predecessor_account_id();
-		let balance = self.fdai_balances.get(&from).unwrap();
-		assert!(balance >= &spend);
+	// pub fn place_order(&mut self, market_id: u64, outcome: u64, spend: u128, price: u128) {
+	// 	let from = env::predecessor_account_id();
+	// 	let balance = self.fdai_balances.get(&from).unwrap();
+	// 	assert!(balance >= &spend);
 
-		let amount_of_shares = spend / price;
-		let rounded_spend = amount_of_shares * price;
-		let market = self.active_markets.get_mut(&market_id).unwrap();
-		market.place_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price);
+	// 	let amount_of_shares = spend / price;
+	// 	let rounded_spend = amount_of_shares * price;
+	// 	let market = self.active_markets.get_mut(&market_id).unwrap();
+	// 	market.place_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price);
 
-		self.subtract_balance(rounded_spend);
-	}
+	// 	self.subtract_balance(rounded_spend);
+	// }
 
 	pub fn cancel_order(&mut self, market_id: u64, outcome: u64, order_id: u128) {
 		let from = env::predecessor_account_id();
@@ -104,6 +150,7 @@ impl Markets {
 		let order = orderbook.open_orders.get(&order_id).unwrap();
 		assert!(from == order.creator);
 		orderbook.remove_order(order_id);
+		// TODO: ADD fdai balance back to user
     }
 
 	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
@@ -112,27 +159,27 @@ impl Markets {
 		market.resolute(from, winning_outcome);
 	}
 
-	fn subtract_balance(&mut self, amount: u128) {
-		let from = env::predecessor_account_id();
-		let balance = self.fdai_balances.get(&from).unwrap();
-		let new_balance = *balance - amount;
-		self.fdai_balances.insert(from, new_balance);
+	// fn subtract_balance(&mut self, amount: u128) {
+	// 	let from = env::predecessor_account_id();
+	// 	let balance = self.fdai_balances.get(&from).unwrap();
+	// 	let new_balance = *balance - amount;
+	// 	self.fdai_balances.insert(from, new_balance);
 
-		// For monitoring supply - just for testnet
-		self.fdai_outside_escrow = self.fdai_outside_escrow - amount as u128;
-		self.fdai_in_protocol= self.fdai_outside_escrow + amount as u128;
-	}
+	// 	// For monitoring supply - just for testnet
+	// 	self.fdai_outside_escrow = self.fdai_outside_escrow - amount as u128;
+	// 	self.fdai_in_protocol= self.fdai_outside_escrow + amount as u128;
+	// }
 
-	fn add_balance(&mut self, amount: u128) {
-		let from = env::predecessor_account_id();
-		let balance = self.fdai_balances.get(&from).unwrap();
-		let new_balance = *balance + amount;
-		self.fdai_balances.insert(from, new_balance);
+	// fn add_balance(&mut self, amount: u128) {
+	// 	let from = env::predecessor_account_id();
+	// 	let balance = self.fdai_balances.get(&from).unwrap();
+	// 	let new_balance = *balance + amount;
+	// 	self.fdai_balances.insert(from, new_balance);
 
-		// For monitoring supply - just for testnet
-		self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
-		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
-	}
+	// 	// For monitoring supply - just for testnet
+	// 	self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
+	// 	self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
+	// }
 
 	pub fn get_open_orders(&self, market_id: u64, outcome: u64) -> &HashMap<u128, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
@@ -158,7 +205,7 @@ impl Markets {
 		let claimable = market.get_claimable(account_id.to_string());
 		market.delete_orders_for(account_id.to_string());
 
-		self.add_balance(claimable);
+		// self.add_balance(claimable);
 	}
 
 	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> {
@@ -210,10 +257,6 @@ impl Markets {
 		return market.get_market_prices();
 	}
 
-	pub fn get_fdai_metrics(&self) -> (u128, u128, u128, u64) {
-		return (self.fdai_circulation, self.fdai_in_protocol, self.fdai_outside_escrow, self.user_count);
-	}
-
 }
 
 impl Default for Markets {
@@ -222,10 +265,7 @@ impl Default for Markets {
 			creator: "flux-dev".to_string(),
 			active_markets: BTreeMap::new(),
 			nonce: 0,
-			fdai_balances: HashMap::new(),
-			fdai_circulation: 0,
-			fdai_in_protocol: 0,
-			fdai_outside_escrow: 0,
+			fdai_address: "fdai_test_local".to_string(),
 			user_count: 0
 		}
 	}
@@ -281,23 +321,24 @@ mod tests {
             predecessor_account_id,
             input: vec![],
             block_index: 0,
-            account_balance: 0,
+            account_balance: 10u128.pow(22),
 			is_view: false,
             storage_usage: 0,
 			block_timestamp: block_timestamp,
 			account_locked_balance: 0,
             attached_deposit: 0,
-            prepaid_gas: 10u64.pow(11),
+            prepaid_gas: 10u64.pow(16),
             random_seed: vec![0, 1, 2],
             output_data_receivers: vec![],
 		}
 	}
 
-	mod init_tests;
-	mod market_order_tests;
-	mod binary_order_matching_tests;
-	mod categorical_market_tests;
-	mod market_resolution_tests;
-	mod claim_earnings_tests;
-	mod market_depth_tests;
+	// mod init_tests;
+	mod fdai_tests;
+	// mod market_order_tests;
+	// mod binary_order_matching_tests;
+	// mod categorical_market_tests;
+	// mod market_resolution_tests;
+	// mod claim_earnings_tests;
+	// mod market_depth_tests;
 }

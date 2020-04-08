@@ -1,4 +1,5 @@
 /target
 **/*.rs.bk
 .DS_STORE
+/res
 # /protocol/neardev

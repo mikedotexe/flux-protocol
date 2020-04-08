@@ -1,0 +1,1 @@
+near call flux-protocol-alpha get_fdai_balance "{\"account_id\": \"local-dev\"}" --accountId local-dev --nodeUrl "http://localhost:3030"
