@@ -50,7 +50,7 @@ impl Market {
 			outcome_tags,
 			categories,
 			last_price_for_outcomes: HashMap::new(),
-			creation_time: env::block_timestamp(),
+			creation_time: env::block_timestamp() / 1000000,
 			end_time,
 			orderbooks: empty_orderbooks,
 			winning_outcome: None,
@@ -63,7 +63,7 @@ impl Market {
 		assert!(spend > 0);
 		assert!(price > 0 && price < 100);
 		assert_eq!(self.resoluted, false);
-		assert!(env::block_timestamp() < self.end_time);
+		assert!(env::block_timestamp() / 1000000 < self.end_time);
 
 		let (spend_left, shares_filled) = self.fill_matches(outcome, spend, price);
 		let total_spend = spend - spend_left;
@@ -158,7 +158,7 @@ impl Market {
 
 	pub fn resolute(&mut self,from: String, winning_outcome: Option<u64>) {
 		// TODO: Make sure market can only be resoluted after end time
-		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
+		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false);
 		assert_eq!(from, self.creator);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
@@ -168,7 +168,7 @@ impl Market {
 
 	pub fn get_claimable(&self, from: String) -> u128 {
 		assert_eq!(self.resoluted, true);
-		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
+		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 
@@ -187,7 +187,7 @@ impl Market {
 	}
 
     // Updates the best price for an order once initial best price is filled
-	fn update_next_best_price(&mut self, inverse_orderbook_ids: &Vec<u64>, first_iteration: &bool, outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, best_order_exists: &mut bool, market_price: &mut u128, lowest_liquidity: &u128) {
+	fn update_next_best_price(&self, inverse_orderbook_ids: &Vec<u64>, first_iteration: &bool, outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, best_order_exists: &mut bool, market_price: &mut u128, lowest_liquidity: &u128) {
 	    for orderbook_id in inverse_orderbook_ids {
             let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
             if !first_iteration {
@@ -215,7 +215,7 @@ impl Market {
 	}
 
     // Updates the lowest liquidity available amongst best prices
-	fn update_lowest_liquidity(&mut self, inverse_orderbook_ids: &Vec<u64>, first_iteration: &bool, lowest_liquidity: &mut u128, outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, best_order_exists: &mut bool) {
+	fn update_lowest_liquidity(&self, inverse_orderbook_ids: &Vec<u64>, first_iteration: &bool, lowest_liquidity: &mut u128, outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, best_order_exists: &mut bool) {
 	    *best_order_exists = false;
 	    for orderbook_id in inverse_orderbook_ids {
             // Get lowest liquidity at new price
@@ -233,10 +233,10 @@ impl Market {
             else if *lowest_liquidity > liquidity { *lowest_liquidity = liquidity}
 
         }
-
 	}
 
-	pub fn get_liquidity(&mut self, outcome: u64, spend: u128, price: u128) -> u128 {
+	// TODO: Add get_liquidity function that doesn't need the spend argument
+	pub fn get_liquidity(&self, outcome: u64, spend: u128, price: u128) -> u128 {
 		let inverse_orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		// Mapped outcome to price and liquidity left
 		let mut outcome_to_price_share_pointer: HashMap<u64,  (u128, u128)> = HashMap::new();

@@ -41,7 +41,7 @@ impl Markets {
 	}
 
 	// This is a demo method, it mints a currency to interact with markets until we have NDAI
-	pub fn claim_fdai(&mut self) -> bool{
+	pub fn claim_fdai(&mut self) {
 		let from = env::predecessor_account_id();
 		let can_claim = self.fdai_balances.get(&from).is_none();
 		assert!(can_claim, "user has already claimed fdai");
@@ -53,7 +53,6 @@ impl Markets {
 		self.fdai_circulation = self.fdai_circulation + claim_amount as u128;
 		self.fdai_outside_escrow = self.fdai_outside_escrow + claim_amount as u128;
 		self.user_count = self.user_count + 1;
-		return true;
 	}
 
 	pub fn get_fdai_balance(&self, from: String) -> u128 {
@@ -64,7 +63,7 @@ impl Markets {
 		assert!(outcomes > 1);
 		assert!(outcomes == 2 || outcomes == outcome_tags.len() as u64);
 		assert!(outcomes < 20); // up for change
-		assert!(end_time > env::block_timestamp());
+		assert!(end_time > env::block_timestamp() / 1000000);
 		assert!(categories.len() < 6);
 
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
@@ -152,7 +151,7 @@ impl Markets {
 
 	pub fn claim_earnings(&mut self, market_id: u64, account_id: String) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
-		assert!(env::block_timestamp() >= market.end_time, "market hasn't ended yet");
+		assert!(env::block_timestamp() / 1000000 >= market.end_time, "market hasn't ended yet");
 		assert_eq!(market.resoluted, true);
 
 		let claimable = market.get_claimable(account_id.to_string());
@@ -181,14 +180,9 @@ impl Markets {
 		return markets;
 	}
 
-	pub fn get_liquidity(&mut self, market_id: u64, outcome: u64, spend: u128, price: u128) -> u128 {
-		let mut market = self.active_markets.get_mut(&market_id).unwrap();
+	pub fn get_liquidity(&self, market_id: u64, outcome: u64, spend: u128, price: u128) -> u128 {
+		let mut market = self.active_markets.get(&market_id).unwrap();
 		return market.get_liquidity(outcome, spend, price);
-	}
-
-	pub fn get_liquidity_for_price(&self, market_id: u64, outcome: u64, price: u128) -> u128 {
-		let orderbook = self.active_markets.get(&market_id).unwrap().orderbooks.get(&outcome).unwrap();
-		return orderbook.get_liquidity_for_price(price);
 	}
 
 	pub fn get_market(&self, id: u64) -> &Market {
