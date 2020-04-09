@@ -35,7 +35,7 @@ pub struct Market {
 	pub api_source: String,
 	pub fees_collected: u128,
 	pub resolvers: BTreeMap<String, u64>, // resolver id to number of votes allowed
-	pub votes: BTreeMap<u64, u64>,
+	pub votes: BTreeMap<u64, u64>, // outcome id to number of votes
 	pub total_votes: u64,
 }
 
@@ -69,6 +69,7 @@ impl Market {
 			fees_collected: 0,
 			resolvers: BTreeMap::new(),
 			votes: BTreeMap::new(),
+			total_votes: 0,
 		}
 	}
 
@@ -185,10 +186,10 @@ impl Market {
 		assert_eq!(from, self.creator);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
 
-        let caller_entry = self.resolvers.get(&from);
-        if caller_entry.is_none() {return}
-        else if *caller_entry <= 0 {return}
-		let vote_count = self.votes.entry(winning_outcome).or_insert(0);
+        if self.resolvers.get(&from).is_none() {return};
+        let caller_entry = self.resolvers.get_mut(&from).unwrap();
+        if *caller_entry <= 0 {return};
+		let vote_count = self.votes.entry(winning_outcome.unwrap()).or_insert(0);
 		*vote_count += 1;
 		*caller_entry -= 1;
 		if *vote_count > self.total_votes / self.outcomes {
