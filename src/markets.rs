@@ -19,6 +19,10 @@ struct Markets {
 	fdai_outside_escrow: u128,
 	user_count: u64,
 	max_fee_percentage: u128,
+	resolvers: BTreeMap<u64, String>, // ticket id to resolver id
+	last_ticket_id: u64,
+	ticket_price: u128,
+	creation_bond: u128,
 }
 
 #[near_bindgen]
@@ -74,7 +78,7 @@ impl Markets {
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
 		// TODO check if end_time hasn't happened yet
 		let from = env::predecessor_account_id();
-		// TODO: Decrement bond from creator's account
+		// TODO: Escrow bond from creator's account
 		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, categories, end_time, fee_percentage, cost_percentage, api_source);
 		let market_id = new_market.id;
 		self.active_markets.insert(self.nonce, new_market);
@@ -137,6 +141,34 @@ impl Markets {
 		// For monitoring supply - just for testnet
 		self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
+	}
+
+    // Purchase resolution tickets
+    fn purchase_tickets(&mut self, from: String, spend: u128) {
+        let num_tickets = spend / self.ticket_price;
+        for i in 0..num_tickets {
+            // TODO: Decrement balance of spender
+            if self.last_ticket_id == 0 {
+                self.resolvers.insert(1, from.clone());
+            } else {
+                self.resolvers.insert(self.last_ticket_id+1, from.clone());
+            }
+            self.last_ticket_id += 1;
+        }
+    }
+
+	// Meant to be called once at end of epoch
+	fn set_resolvers(&mut self) {
+	    // TODO: If already resoluted & not disputed, dont call
+	    for (key, value) in self.active_markets.iter_mut() {
+	        // TODO: Add num resolvers as function of security model
+	        for j in 0..10 {
+	            // TODO: get random number
+	            let random_number: &u64 = &1;
+                let resolver_id = self.resolvers.get(&random_number).unwrap();
+                value.add_resolver(resolver_id.to_string());
+	        }
+	    }
 	}
 
 	pub fn get_open_orders(&self, market_id: u64, outcome: u64) -> &HashMap<u128, Order> {
@@ -237,6 +269,10 @@ impl Default for Markets {
 			fdai_outside_escrow: 0,
 			user_count: 0,
 			max_fee_percentage: 0,
+			resolvers: BTreeMap::new(),
+			last_ticket_id: 0,
+			ticket_price: 1,
+			creation_bond: 0,
 		}
 	}
 }

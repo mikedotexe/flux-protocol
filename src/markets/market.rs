@@ -33,7 +33,8 @@ pub struct Market {
 	pub fee_percentage: u128,
 	pub cost_percentage: u128,
 	pub api_source: String,
-	pub fees_collected: u128
+	pub fees_collected: u128,
+	pub resolvers: BTreeMap<String, u64>, // resolver id to number of votes allowed
 }
 
 impl Market {
@@ -64,6 +65,7 @@ impl Market {
 			cost_percentage,
 			api_source,
 			fees_collected: 0,
+			resolvers: BTreeMap::new(),
 		}
 	}
 
@@ -107,6 +109,11 @@ impl Market {
 		shares_filled += shares_to_fill;
 
 		return (spend, shares_filled);
+	}
+
+	pub fn add_resolver(&mut self, resolver_id: String) {
+	    let votes = self.resolvers.entry(resolver_id).or_insert(0);
+	    *votes += 1;
 	}
 
 	pub fn get_min_shares_fillable(&self, outcome: u64) -> u128 {
