@@ -192,7 +192,7 @@ impl Market {
 		let vote_count = self.votes.entry(winning_outcome.unwrap()).or_insert(0);
 		*vote_count += 1;
 		*caller_entry -= 1;
-		if *vote_count > self.total_votes / self.outcomes {
+		if *vote_count >= self.total_votes / self.outcomes {
 		    self.winning_outcome = winning_outcome;
             self.resoluted = true;
 		}
