@@ -111,6 +111,17 @@ impl Markets {
 		market.resolute(from, winning_outcome);
 	}
 
+	pub fn dispute(&mut self, market_id: u64, winning_outcome: Option<u64>, bond: u128) {
+	    let from = env::predecessor_account_id();
+        let market = self.active_markets.get_mut(&market_id).unwrap();
+        market.dispute(from, winning_outcome, bond);
+	}
+
+	pub fn finalize_market(&mut self, market_id: u64) {
+	    let market = self.active_markets.get_mut(&market_id).unwrap();
+        market.finalize();
+	}
+
 	fn subtract_balance(&mut self, amount: u128) {
 		let from = env::predecessor_account_id();
 		let balance = self.fdai_balances.get(&from).unwrap();
@@ -293,5 +304,5 @@ mod tests {
 	mod categorical_market_tests;
 	mod market_resolution_tests;
 	mod claim_earnings_tests;
-	mod market_depth_tests;
+	//mod market_depth_tests;
 }

@@ -29,7 +29,10 @@ pub struct Market {
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub winning_outcome: Option<u64>,
 	pub resoluted: bool,
-	pub liquidity: u128
+	pub liquidity: u128,
+	pub disputed: bool,
+	pub dispute_thresh: u128,
+	pub finalized: bool,
 }
 
 impl Market {
@@ -55,7 +58,10 @@ impl Market {
 			orderbooks: empty_orderbooks,
 			winning_outcome: None,
 			resoluted: false,
-			liquidity: 0
+			liquidity: 0,
+			disputed: false,
+			dispute_thresh: 0,
+			finalized: false,
 		}
 	}
 
@@ -77,7 +83,7 @@ impl Market {
 		let mut market_price = self.get_market_price(outcome);
 		if market_price > price { return (spend,0) }
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
-		
+
 		let mut shares_filled = 0;
 		let mut spendable = spend;
 
@@ -85,11 +91,11 @@ impl Market {
 			let mut shares_to_fill = spendable / market_price;
 			let shares_fillable = self.get_min_shares_fillable(outcome);
 			self.last_price_for_outcomes.insert(outcome, market_price);
-			
+
 			if shares_fillable < shares_to_fill {
 				shares_to_fill = shares_fillable;
 			}
-			
+
 			for orderbook_id in &orderbook_ids {
 				let orderbook = self.orderbooks.get_mut(orderbook_id).unwrap();
 				if !orderbook.best_price.is_none() {
@@ -98,7 +104,7 @@ impl Market {
 					orderbook.fill_best_orders(shares_to_fill);
 				}
 			}
-			
+
 			spendable -= shares_to_fill * market_price;
 			shares_filled += shares_to_fill;
 			market_price = self.get_market_price(outcome);
@@ -156,7 +162,7 @@ impl Market {
 		return orderbooks;
 	}
 
-	pub fn resolute(&mut self,from: String, winning_outcome: Option<u64>) {
+	pub fn resolute(&mut self, from: String, winning_outcome: Option<u64>) {
 		// TODO: Make sure market can only be resoluted after end time
 		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false);
@@ -164,6 +170,27 @@ impl Market {
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
 		self.winning_outcome = winning_outcome;
 		self.resoluted = true;
+	}
+
+	pub fn dispute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) {
+	    assert_eq!(self.resoluted, true);
+        assert_eq!(from, self.creator);
+        assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome);
+        // TODO: Need metric for initial dispute threshold
+        if bond > self.dispute_thresh {
+            self.dispute_thresh *= 2;
+            self.winning_outcome = winning_outcome;
+            self.disputed = true;
+        }
+	}
+
+	pub fn finalize(&mut self) {
+	    assert_eq!(self.resoluted, true);
+	    if self.disputed {
+	        self.disputed = false;
+	    } else {
+	        self.finalized = true;
+	    }
 	}
 
 	pub fn get_claimable(&self, from: String) -> u128 {
