@@ -35,6 +35,8 @@ pub struct Market {
 	pub api_source: String,
 	pub fees_collected: u128,
 	pub resolvers: BTreeMap<String, u64>, // resolver id to number of votes allowed
+	pub votes: BTreeMap<u64, u64>,
+	pub total_votes: u64,
 }
 
 impl Market {
@@ -66,6 +68,7 @@ impl Market {
 			api_source,
 			fees_collected: 0,
 			resolvers: BTreeMap::new(),
+			votes: BTreeMap::new(),
 		}
 	}
 
@@ -114,6 +117,7 @@ impl Market {
 	pub fn add_resolver(&mut self, resolver_id: String) {
 	    let votes = self.resolvers.entry(resolver_id).or_insert(0);
 	    *votes += 1;
+	    self.total_votes += 1;
 	}
 
 	pub fn get_min_shares_fillable(&self, outcome: u64) -> u128 {
@@ -180,8 +184,17 @@ impl Market {
 		assert_eq!(self.resoluted, false);
 		assert_eq!(from, self.creator);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
-		self.winning_outcome = winning_outcome;
-		self.resoluted = true;
+
+        let caller_entry = self.resolvers.get(&from);
+        if caller_entry.is_none() {return}
+        else if *caller_entry <= 0 {return}
+		let vote_count = self.votes.entry(winning_outcome).or_insert(0);
+		*vote_count += 1;
+		*caller_entry -= 1;
+		if *vote_count > self.total_votes / self.outcomes {
+		    self.winning_outcome = winning_outcome;
+            self.resoluted = true;
+		}
 	}
 
 	pub fn get_claimable(&self, from: String) -> u128 {
