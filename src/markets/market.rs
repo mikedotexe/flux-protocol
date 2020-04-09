@@ -29,11 +29,15 @@ pub struct Market {
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub winning_outcome: Option<u64>,
 	pub resoluted: bool,
-	pub liquidity: u128
+	pub liquidity: u128,
+	pub fee_percentage: u128,
+	pub cost_percentage: u128,
+	pub api_source: String,
+	pub fees_collected: u128
 }
 
 impl Market {
-	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> Self {
+	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64, fee_percentage: u128, cost_percentage: u128, api_source: String) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
 		// TODO get blocktime at creation
 
@@ -55,7 +59,11 @@ impl Market {
 			orderbooks: empty_orderbooks,
 			winning_outcome: None,
 			resoluted: false,
-			liquidity: 0
+			liquidity: 0,
+			fee_percentage,
+			cost_percentage,
+			api_source,
+			fees_collected: 0,
 		}
 	}
 
@@ -64,12 +72,14 @@ impl Market {
 		assert!(price > 0 && price < 100);
 		assert_eq!(self.resoluted, false);
 		assert!(env::block_timestamp() < self.end_time);
-		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price, 0);
-		let total_spend = spend - spend_filled;
-		self.liquidity += spend;
+		let fee_adjusted_spend = spend*(100-self.fee_percentage)/100;
+		let (spend_filled, shares_filled) = self.fill_matches(outcome, fee_adjusted_spend, price, 0);
+		let total_spend = fee_adjusted_spend - spend_filled;
+		self.liquidity += fee_adjusted_spend;
 		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
-		orderbook.place_order(from, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
+		orderbook.place_order(from, outcome, fee_adjusted_spend, amt_of_shares, price, total_spend, shares_filled);
+		self.fees_collected += spend - fee_adjusted_spend
 	}
 
 	fn fill_matches(&mut self, outcome: u64, mut spend: u128, price: u128, mut shares_filled: u128) -> (u128, u128) {
@@ -185,6 +195,10 @@ impl Market {
 			claimable += winning_orderbook.calc_claimable_amt(from);
 		}
 		return claimable;
+	}
+
+	pub fn get_claimable_fees(&self) -> u128 {
+	    return self.fees_collected;
 	}
 
     // Updates the best price for an order once initial best price is filled

@@ -17,7 +17,8 @@ struct Markets {
 	fdai_circulation: u128,
 	fdai_in_protocol: u128,
 	fdai_outside_escrow: u128,
-	user_count: u64
+	user_count: u64,
+	max_fee_percentage: u128,
 }
 
 #[near_bindgen]
@@ -60,17 +61,21 @@ impl Markets {
 		return *self.fdai_balances.get(&from).unwrap();
 	}
 
-	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> u64 {
+	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64, fee_percentage: u128, cost_percentage: u128, api_source: String) -> u64 {
 		assert!(outcomes > 1);
 		assert!(outcomes == 2 || outcomes == outcome_tags.len() as u64);
 		assert!(outcomes < 20); // up for change
 		assert!(end_time > env::block_timestamp());
 		assert!(categories.len() < 6);
+		assert!(fee_percentage <= self.max_fee_percentage);
+		assert!(api_source != "".to_string());
+		assert!(fee_percentage >= cost_percentage);
 
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
 		// TODO check if end_time hasn't happened yet
 		let from = env::predecessor_account_id();
-		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, categories, end_time);
+		// TODO: Decrement bond from creator's account
+		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, categories, end_time, fee_percentage, cost_percentage, api_source);
 		let market_id = new_market.id;
 		self.active_markets.insert(self.nonce, new_market);
 		self.nonce = self.nonce + 1;
@@ -150,6 +155,10 @@ impl Markets {
 		return self.active_markets.get(&market_id).unwrap().get_claimable(from);
 	}
 
+	pub fn get_claimable_fees(&self, market_id: u64) -> u128 {
+	    return self.active_markets.get(&market_id).unwrap().get_claimable_fees();
+	}
+
 	pub fn claim_earnings(&mut self, market_id: u64, account_id: String) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert!(env::block_timestamp() >= market.end_time, "market hasn't ended yet");
@@ -226,7 +235,8 @@ impl Default for Markets {
 			fdai_circulation: 0,
 			fdai_in_protocol: 0,
 			fdai_outside_escrow: 0,
-			user_count: 0
+			user_count: 0,
+			max_fee_percentage: 0,
 		}
 	}
 }
@@ -293,11 +303,11 @@ mod tests {
 		}
 	}
 
-	// mod init_tests;
-	// mod market_order_tests;
-	// mod binary_order_matching_tests;
-	// mod categorical_market_tests;
-	// mod market_resolution_tests;
-	// mod claim_earnings_tests;
+	mod init_tests;
+	mod market_order_tests;
+	mod binary_order_matching_tests;
+	mod categorical_market_tests;
+	mod market_resolution_tests;
+	mod claim_earnings_tests;
 	mod market_depth_tests;
 }
