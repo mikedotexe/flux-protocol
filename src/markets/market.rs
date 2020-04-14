@@ -1,7 +1,7 @@
 use std::string::String;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use near_bindgen::{near_bindgen, env};
+use near_sdk::{near_bindgen, env};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
@@ -113,7 +113,7 @@ impl Market {
 		for orderbook_id in orderbook_ids {
 			let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
 			if !orderbook.best_price.is_none() {
-				let best_price_liquidity = orderbook.get_liquidity_for_price(orderbook.best_price.unwrap());
+				let best_price_liquidity = orderbook.get_liquidity(orderbook.best_price.unwrap());
 				if shares.is_none() || shares.unwrap() > best_price_liquidity {shares = Some(best_price_liquidity)}
 			}
 		}
@@ -167,8 +167,6 @@ impl Market {
 	}
 
 	pub fn get_claimable(&self, from: String) -> u128 {
-		assert_eq!(self.resoluted, true);
-		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 
@@ -208,7 +206,7 @@ impl Market {
                     let next_best_price = *next_best_price_prom.unwrap().0;
                     let add_to_market_price =  price_liquidity.0 - next_best_price;
                     *market_price += add_to_market_price;
-                    outcome_to_price_share_pointer.insert(*orderbook_id, (next_best_price, orderbook.get_liquidity_for_price(next_best_price)));
+                    outcome_to_price_share_pointer.insert(*orderbook_id, (next_best_price, orderbook.get_liquidity(next_best_price)));
                 }
             }
         }
@@ -224,7 +222,7 @@ impl Market {
                 let price = orderbook.best_price;
                 if price.is_none() {continue}
                 *best_order_exists = true;
-                let liquidity = orderbook.get_liquidity_for_price(price.unwrap());
+                let liquidity = orderbook.get_liquidity(price.unwrap());
                 outcome_to_price_share_pointer.insert(*orderbook_id, (price.unwrap(), liquidity));
             }
             if outcome_to_price_share_pointer.get(orderbook_id).is_none() {continue}

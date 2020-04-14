@@ -1,4 +1,4 @@
-use near_bindgen::{near_bindgen, env};
+use near_sdk::{near_bindgen, env};
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::collections::{BTreeMap, HashMap};
 use serde::{Deserialize, Serialize};
@@ -180,9 +180,16 @@ impl Markets {
 		return markets;
 	}
 
-	pub fn get_liquidity(&self, market_id: u64, outcome: u64, spend: u128, price: u128) -> u128 {
-		let mut market = self.active_markets.get(&market_id).unwrap();
+	pub fn get_depth(&self, market_id: u64, outcome: u64, spend: u128, price: u128) -> u128 {
+		let market = self.active_markets.get(&market_id).unwrap();
 		return market.get_liquidity(outcome, spend, price);
+	}
+
+	pub fn get_liquidity(&self, market_id: u64, outcome: u64, price: u128) -> u128 {
+		let market = self.active_markets.get(&market_id).unwrap();
+		let orderbook = market.orderbooks.get(&outcome).unwrap();
+
+		return orderbook.get_liquidity(price);
 	}
 
 	pub fn get_market(&self, id: u64) -> &Market {
@@ -229,8 +236,8 @@ impl Default for Markets {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use near_bindgen::MockedBlockchain;
-    use near_bindgen::{VMContext, VMConfig, testing_env};
+    use near_sdk::MockedBlockchain;
+    use near_sdk::{VMContext, VMConfig, testing_env};
 
 	fn alice() -> String {
 		return "alice.near".to_string();
@@ -263,8 +270,12 @@ mod tests {
 	fn current_block_timestamp() -> u64 {
 		return 123789;
 	}
+	
+	fn market_creation_timestamp() -> u64 {
+		return 12378;
+	}
 	fn market_end_timestamp() -> u64 {
-		return current_block_timestamp() + 1;
+		return 12379000000;
 	}
 
 	fn get_context(predecessor_account_id: String, block_timestamp: u64) -> VMContext {
@@ -274,7 +285,8 @@ mod tests {
             signer_account_pk: vec![0, 1, 2],
             predecessor_account_id,
             input: vec![],
-            block_index: 0,
+			block_index: 0,
+			epoch_height: 0,
             account_balance: 0,
 			is_view: false,
             storage_usage: 0,
