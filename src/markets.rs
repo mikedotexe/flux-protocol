@@ -19,9 +19,6 @@ struct Markets {
 	fdai_outside_escrow: u128,
 	user_count: u64,
 	max_fee_percentage: u128,
-	resolvers: BTreeMap<u64, String>, // ticket id to resolver id
-	last_ticket_id: u64,
-	ticket_price: u128,
 	creation_bond: u128,
 }
 
@@ -72,7 +69,6 @@ impl Markets {
 		assert!(end_time > env::block_timestamp());
 		assert!(categories.len() < 6);
 		assert!(fee_percentage <= self.max_fee_percentage);
-		assert!(api_source != "".to_string());
 		assert!(fee_percentage >= cost_percentage);
 
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
@@ -118,7 +114,13 @@ impl Markets {
 	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
 		let from = env::predecessor_account_id();
 		let market = self.active_markets.get_mut(&market_id).unwrap();
-		market.resolute(from, winning_outcome);
+
+		let bond = market.get_resolute_bond();
+		let balance = self.fdai_balances.get(&from).unwrap();
+        assert!(balance >= &bond);
+
+		market.resolute(from, winning_outcome, bond);
+		self.subtract_balance(bond);
 	}
 
 	fn subtract_balance(&mut self, amount: u128) {
@@ -143,34 +145,6 @@ impl Markets {
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
 	}
 
-    // Purchase resolution tickets
-    fn purchase_tickets(&mut self, from: String, spend: u128) {
-        let num_tickets = spend / self.ticket_price;
-        for i in 0..num_tickets {
-            // TODO: Decrement balance of spender
-            if self.last_ticket_id == 0 {
-                self.resolvers.insert(1, from.clone());
-            } else {
-                self.resolvers.insert(self.last_ticket_id+1, from.clone());
-            }
-            self.last_ticket_id += 1;
-        }
-    }
-
-	// Meant to be called once at end of epoch
-	fn set_resolvers(&mut self) {
-	    // TODO: If already resoluted & not disputed, dont call
-	    for (key, value) in self.active_markets.iter_mut() {
-	        // TODO: Add num resolvers as function of security model
-	        for j in 0..10 {
-	            // TODO: get random number
-	            let random_number: &u64 = &1;
-                let resolver_id = self.resolvers.get(&random_number).unwrap();
-                value.add_resolver(resolver_id.to_string());
-	        }
-	    }
-	}
-
 	pub fn get_open_orders(&self, market_id: u64, outcome: u64) -> &HashMap<u128, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
@@ -187,9 +161,6 @@ impl Markets {
 		return self.active_markets.get(&market_id).unwrap().get_claimable(from);
 	}
 
-	pub fn get_claimable_fees(&self, market_id: u64) -> u128 {
-	    return self.active_markets.get(&market_id).unwrap().get_claimable_fees();
-	}
 
 	pub fn claim_earnings(&mut self, market_id: u64, account_id: String) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
@@ -269,9 +240,6 @@ impl Default for Markets {
 			fdai_outside_escrow: 0,
 			user_count: 0,
 			max_fee_percentage: 0,
-			resolvers: BTreeMap::new(),
-			last_ticket_id: 0,
-			ticket_price: 1,
 			creation_bond: 0,
 		}
 	}
