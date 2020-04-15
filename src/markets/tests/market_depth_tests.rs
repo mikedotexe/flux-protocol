@@ -1,13 +1,5 @@
 use super::*;
 
-<<<<<<< HEAD
-#[test]
-fn test_liquidity_for_price() {
-	testing_env!(get_context(carol(), current_block_timestamp()));
-	let mut contract = Markets::default();
-	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), market_end_timestamp());
-=======
 // #[test]
 // fn test_liquidity_for_price() {
 // 	testing_env!(get_context(carol(), current_block_timestamp()));
@@ -45,7 +37,7 @@ fn test_liquidity_for_price() {
 
 //	assert_eq!(liquidity_20, 4000 / 20);
 //	assert_eq!(liquidity_80, 0);
-}
+//}
 
 #[test]
 fn test_valid_binary_market_depth() {

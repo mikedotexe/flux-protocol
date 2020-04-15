@@ -30,16 +30,14 @@ pub struct Market {
 	pub winning_outcome: Option<u64>,
 	pub resoluted: bool,
 	pub liquidity: u128,
-<<<<<<< HEAD
 	pub disputed: bool,
 	pub dispute_thresh: u128,
+	pub dispute_round: u64,
 	pub finalized: bool,
-=======
 	pub fee_percentage: u128,
 	pub cost_percentage: u128,
 	pub api_source: String,
-	pub resolvers: BTreeMap<String, (Option<u64>, u64, u128)>, // resolver id to (outcome, round, stake)
->>>>>>> f9970cdd758d5cf809da4738b645c4ba950e7a3d
+	pub resolvers: BTreeMap<u64, Vec<(String, Option<u64>, u128)>>, // round to (resolver id, outcome, stake)
 }
 
 impl Market {
@@ -66,16 +64,14 @@ impl Market {
 			winning_outcome: None,
 			resoluted: false,
 			liquidity: 0,
-<<<<<<< HEAD
 			disputed: false,
 			dispute_thresh: 0,
 			finalized: false,
-=======
 			fee_percentage,
 			cost_percentage,
 			api_source,
 			resolvers: BTreeMap::new(),
->>>>>>> f9970cdd758d5cf809da4738b645c4ba950e7a3d
+			dispute_round: 0,
 		}
 	}
 
@@ -85,7 +81,7 @@ impl Market {
 		assert_eq!(self.resoluted, false);
 		assert!(env::block_timestamp() < self.end_time);
 		// TODO: NOTE==THIS IS WHERE THE ROUNDING PREVIOUSLY HAPPENED
-		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price, 0);
+		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price);
 		let total_spend = spend - spend_filled;
 		self.liquidity += spend_filled;
 		let shares_filled = shares_filled;
@@ -108,7 +104,7 @@ impl Market {
 
 			if shares_fillable < shares_to_fill {
 				shares_to_fill = shares_fillable;
-
+            }
 			for orderbook_id in &orderbook_ids {
 				let orderbook = self.orderbooks.get_mut(orderbook_id).unwrap();
 				if !orderbook.best_price.is_none() {
@@ -186,23 +182,49 @@ impl Market {
         self.resoluted = true;
 
         // Insert (outcome, round, stake)
-        let bond = self.liquidity * self.cost_percentage;
-        self.resolvers.insert(from, (winning_outcome, 1, bond));
+        let bond = self.get_resolute_bond();
+        let resolution = self.resolvers.entry(0).or_insert(Vec::new());
+        resolution.push((from, winning_outcome, bond));
+        self.dispute_round = 0;
 	}
 
 	pub fn get_resolute_bond(&self) -> u128 {
 	    return self.liquidity * self.cost_percentage;
 	}
 
-	pub fn dispute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) {
+	pub fn get_dispute_progress(&mut self, winning_outcome: Option<u64>) -> u128 {
+	    let round_disputes = self.resolvers.entry(self.dispute_round).or_insert(Vec::new());
+        let mut progress = 0;
+
+        for value in round_disputes.iter() {
+            if value.1 == winning_outcome {
+                progress += value.2;
+            }
+        }
+        return progress;
+	}
+
+	pub fn dispute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) -> u128{
 	    assert_eq!(self.resoluted, true);
         assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome);
-        // TODO: Need metric for initial dispute threshold
-        if bond > self.dispute_thresh {
+        if self.dispute_round == 0 {
+            self.dispute_thresh = self.get_resolute_bond();
+            self.dispute_round = 1;
+        }
+
+        let progress = self.get_dispute_progress(winning_outcome);
+        let mut return_amount = 0;
+        if bond + progress >= self.dispute_thresh {
+            return_amount = bond + progress - self.dispute_thresh;
             self.dispute_thresh *= 2;
             self.winning_outcome = winning_outcome;
             self.disputed = true;
+            self.dispute_round += 1;
+        } else {
+           let round_resolvers = self.resolvers.entry(self.dispute_round).or_insert(Vec::new());
+           round_resolvers.push((from, winning_outcome, bond));
         }
+        return return_amount;
 	}
 
 	pub fn finalize(&mut self) {
@@ -236,10 +258,31 @@ impl Market {
 				claimable += orderbook.get_open_order_value_for(from.to_string());
 			}
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
-			let winning_value = winning_orderbook.calc_claimable_amt(from);
+			let winning_value = winning_orderbook.calc_claimable_amt(from.to_string());
 			claimable += winning_value * (100-self.fee_percentage);
 		}
+
+		// Claiming Dispute Earnings
+        claimable += self.get_dispute_earnings(from.to_string());
 		return claimable;
+	}
+
+	fn get_dispute_earnings(&self, from: String) -> u128 {
+        let mut resolute_claimable = self.get_resolute_bond();
+        let mut user_correctly_staked = 0;
+        let mut total_correctly_staked = 0;
+        for (round, round_vec) in self.resolvers.iter() {
+            for dispute in round_vec.iter() {
+                if dispute.0 == from && dispute.1 == self.winning_outcome {
+                    user_correctly_staked += dispute.2;
+                }
+                if dispute.1 == self.winning_outcome {
+                    total_correctly_staked += dispute.2;
+                }
+                resolute_claimable += dispute.2;
+            }
+        }
+        return user_correctly_staked / total_correctly_staked * resolute_claimable;
 	}
 
     // Updates the best price for an order once initial best price is filled
