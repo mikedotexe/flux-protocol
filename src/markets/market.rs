@@ -30,13 +30,20 @@ pub struct Market {
 	pub winning_outcome: Option<u64>,
 	pub resoluted: bool,
 	pub liquidity: u128,
+<<<<<<< HEAD
 	pub disputed: bool,
 	pub dispute_thresh: u128,
 	pub finalized: bool,
+=======
+	pub fee_percentage: u128,
+	pub cost_percentage: u128,
+	pub api_source: String,
+	pub resolvers: BTreeMap<String, (Option<u64>, u64, u128)>, // resolver id to (outcome, round, stake)
+>>>>>>> f9970cdd758d5cf809da4738b645c4ba950e7a3d
 }
 
 impl Market {
-	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> Self {
+	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64, fee_percentage: u128, cost_percentage: u128, api_source: String) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
 		// TODO get blocktime at creation
 
@@ -59,9 +66,16 @@ impl Market {
 			winning_outcome: None,
 			resoluted: false,
 			liquidity: 0,
+<<<<<<< HEAD
 			disputed: false,
 			dispute_thresh: 0,
 			finalized: false,
+=======
+			fee_percentage,
+			cost_percentage,
+			api_source,
+			resolvers: BTreeMap::new(),
+>>>>>>> f9970cdd758d5cf809da4738b645c4ba950e7a3d
 		}
 	}
 
@@ -69,11 +83,11 @@ impl Market {
 		assert!(spend > 0);
 		assert!(price > 0 && price < 100);
 		assert_eq!(self.resoluted, false);
-		assert!(env::block_timestamp() / 1000000 < self.end_time);
-
-		let (spend_left, shares_filled) = self.fill_matches(outcome, spend, price);
-		let total_spend = spend - spend_left;
-		self.liquidity += spend;
+		assert!(env::block_timestamp() < self.end_time);
+		// TODO: NOTE==THIS IS WHERE THE ROUNDING PREVIOUSLY HAPPENED
+		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price, 0);
+		let total_spend = spend - spend_filled;
+		self.liquidity += spend_filled;
 		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
@@ -94,7 +108,6 @@ impl Market {
 
 			if shares_fillable < shares_to_fill {
 				shares_to_fill = shares_fillable;
-			}
 
 			for orderbook_id in &orderbook_ids {
 				let orderbook = self.orderbooks.get_mut(orderbook_id).unwrap();
@@ -162,13 +175,23 @@ impl Market {
 		return orderbooks;
 	}
 
-	pub fn resolute(&mut self, from: String, winning_outcome: Option<u64>) {
+
+	pub fn resolute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) {
 		// TODO: Make sure market can only be resoluted after end time
 		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
-		self.winning_outcome = winning_outcome;
-		self.resoluted = true;
+
+        self.winning_outcome = winning_outcome;
+        self.resoluted = true;
+
+        // Insert (outcome, round, stake)
+        let bond = self.liquidity * self.cost_percentage;
+        self.resolvers.insert(from, (winning_outcome, 1, bond));
+	}
+
+	pub fn get_resolute_bond(&self) -> u128 {
+	    return self.liquidity * self.cost_percentage;
 	}
 
 	pub fn dispute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) {
@@ -197,16 +220,24 @@ impl Market {
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 
+        // Claiming fees
+        if from == self.creator {
+            claimable += self.liquidity * (100-self.fee_percentage);
+        }
+
+        // Claiming payouts
 		if invalid {
 			for (_, orderbook) in self.orderbooks.iter() {
-				claimable += orderbook.get_spend_by(from.to_string());
+			    let spent = orderbook.get_spend_by(from.to_string());
+				claimable += spent * (100-self.fee_percentage);
 			}
 		} else {
 			for (_, orderbook) in self.orderbooks.iter() {
 				claimable += orderbook.get_open_order_value_for(from.to_string());
 			}
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
-			claimable += winning_orderbook.calc_claimable_amt(from);
+			let winning_value = winning_orderbook.calc_claimable_amt(from);
+			claimable += winning_value * (100-self.fee_percentage);
 		}
 		return claimable;
 	}
