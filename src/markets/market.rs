@@ -166,7 +166,6 @@ impl Market {
 		// TODO: Make sure market can only be resoluted after end time
 		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false);
-		assert_eq!(from, self.creator);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
 		self.winning_outcome = winning_outcome;
 		self.resoluted = true;
@@ -174,7 +173,6 @@ impl Market {
 
 	pub fn dispute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) {
 	    assert_eq!(self.resoluted, true);
-        assert_eq!(from, self.creator);
         assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome);
         // TODO: Need metric for initial dispute threshold
         if bond > self.dispute_thresh {
