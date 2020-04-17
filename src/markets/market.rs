@@ -30,7 +30,6 @@ pub struct Market {
 	pub winning_outcome: Option<u64>,
 	pub resoluted: bool,
 	pub liquidity: u128,
-	pub finalized_block: u64,
 	pub dispute_thresh: u128,
 	pub dispute_round: u64,
 	pub finalized: bool,
@@ -64,7 +63,6 @@ impl Market {
 			winning_outcome: None,
 			resoluted: false,
 			liquidity: 0,
-			finalized_block: 0,
 			dispute_thresh: 0,
 			finalized: false,
 			fee_percentage,
@@ -187,10 +185,11 @@ impl Market {
         let resolution = self.resolvers.entry(0).or_insert(Vec::new());
         resolution.push((from, winning_outcome, bond));
         self.dispute_round = 0;
+        self.end_time += 10;
 	}
 
 	pub fn get_resolute_bond(&self) -> u128 {
-	    return self.liquidity * self.cost_percentage;
+	    return (self.liquidity * self.cost_percentage)/100;
 	}
 
 	pub fn get_dispute_progress(&mut self, winning_outcome: Option<u64>) -> u128 {
@@ -209,21 +208,23 @@ impl Market {
 	    assert_eq!(self.resoluted, true);
 	    assert_eq!(self.finalized, false);
         assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome);
-        assert!(env::block_index() < self.finalized_block);
+        assert!(env::block_timestamp() < self.end_time);
 
         if self.dispute_round == 0 {
             self.dispute_thresh = self.get_resolute_bond();
             self.dispute_round = 1;
         }
-
         let progress = self.get_dispute_progress(winning_outcome);
         let mut return_amount = 0;
+        //println!("Bond {}, Progress {}, Dispute Thresh {}", bond, progress, self.dispute_thresh);
         if bond + progress >= self.dispute_thresh {
             return_amount = bond + progress - self.dispute_thresh;
             self.dispute_thresh *= 2;
             self.winning_outcome = winning_outcome;
+            let round_resolvers = self.resolvers.entry(self.dispute_round).or_insert(Vec::new());
+            round_resolvers.push((from, winning_outcome, bond));
             // TODO: Pick better block finalization amount
-            self.finalized_block = env::block_index() + 10;
+            self.end_time = env::block_timestamp() + 10;
             self.dispute_round += 1;
         } else {
            let round_resolvers = self.resolvers.entry(self.dispute_round).or_insert(Vec::new());
@@ -234,21 +235,23 @@ impl Market {
 
 	pub fn finalize(&mut self) {
 	    assert_eq!(self.resoluted, true);
-	    if env::block_index() > self.finalized_block {
+	    if env::block_timestamp() >= self.end_time {
 	        self.finalized = true;
 	    }
 	}
 
 	pub fn get_claimable(&self, from: String) -> u128 {
 		assert_eq!(self.resoluted, true);
+		assert_eq!(self.finalized, true);
 		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 
         // Claiming fees
         if from == self.creator {
-            claimable += self.liquidity * (self.fee_percentage)/100;
-            println!("Fees collected by carol: {}", claimable);
+            claimable += self.liquidity * (self.fee_percentage - self.cost_percentage)/100;
+            //println!("liquidity {}", self.liquidity);
+            //println!("Claimable from creator {}", claimable);
         }
 
         // Claiming payouts
@@ -265,10 +268,10 @@ impl Market {
 			let winning_value = winning_orderbook.calc_claimable_amt(from.to_string());
 			claimable += winning_value * (100-self.fee_percentage)/100;
 		}
-
-        println!("Claimable by {} before dispute_earnings: {}", from.to_string(), claimable);
+        //println!("{} Claimable from market: {}", from.to_string(), claimable);
 		// Claiming Dispute Earnings
         claimable += self.get_dispute_earnings(from.to_string());
+        //println!("{} Claimable from dispute: {}", from.to_string(), claimable);
 		return claimable;
 	}
 
@@ -277,6 +280,8 @@ impl Market {
         let mut user_correctly_staked = 0;
         let mut total_correctly_staked = 0;
         for (round, round_vec) in self.resolvers.iter() {
+            //println!("Round {}", round);
+            //println!("{:?}", round_vec);
             for dispute in round_vec.iter() {
                 if dispute.0 == from && dispute.1 == self.winning_outcome {
                     user_correctly_staked += dispute.2;
@@ -284,9 +289,13 @@ impl Market {
                 if dispute.1 == self.winning_outcome {
                     total_correctly_staked += dispute.2;
                 }
+                if *round == 0 {continue}
                 resolute_claimable += dispute.2;
             }
         }
+        //println!("{} Total Correctly Staked {}", from.to_string(), total_correctly_staked);
+        //println!("{} User Correctly Staked {}", from.to_string(), user_correctly_staked);
+        //println!("{} Resolute Claimable {}", from.to_string(), resolute_claimable);
         if total_correctly_staked == 0 {return 0}
         return user_correctly_staked / total_correctly_staked * resolute_claimable;
 	}

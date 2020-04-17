@@ -73,7 +73,6 @@ impl Markets {
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
 		// TODO check if end_time hasn't happened yet
 		let from = env::predecessor_account_id();
-		println!("Contract being created from: {}", from.to_string());
 		// TODO: Escrow bond from creator's account
 		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, categories, end_time, fee_percentage, cost_percentage, api_source);
 		let market_id = new_market.id;
@@ -184,6 +183,11 @@ impl Markets {
 		self.add_balance(claimable);
 	}
 
+	pub fn finalize(&mut self, market_id: u64) {
+	    let market = self.active_markets.get_mut(&market_id).unwrap();
+	    market.finalize();
+	}
+
 	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> {
 		return &self.active_markets;
 	}
@@ -245,7 +249,7 @@ impl Default for Markets {
 			fdai_in_protocol: 0,
 			fdai_outside_escrow: 0,
 			user_count: 0,
-			max_fee_percentage: 0,
+			max_fee_percentage: 5,
 			creation_bond: 0,
 		}
 	}
@@ -320,4 +324,5 @@ mod tests {
 	mod market_resolution_tests;
 	mod claim_earnings_tests;
 	mod market_depth_tests;
+    mod market_dispute_tests;
 }
