@@ -174,7 +174,7 @@ impl Market {
 
 	pub fn resolute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) {
 		// TODO: Make sure market can only be resoluted after end time
-		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
+		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
 
@@ -238,20 +238,21 @@ impl Market {
 
 	pub fn get_claimable(&self, from: String) -> u128 {
 		assert_eq!(self.resoluted, true);
-		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
+		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 
         // Claiming fees
         if from == self.creator {
-            claimable += self.liquidity * (100-self.fee_percentage);
+            claimable += self.liquidity * (self.fee_percentage)/100;
+            println!("Fees collected by carol: {}", claimable);
         }
 
         // Claiming payouts
 		if invalid {
 			for (_, orderbook) in self.orderbooks.iter() {
 			    let spent = orderbook.get_spend_by(from.to_string());
-				claimable += spent * (100-self.fee_percentage);
+				claimable += spent * (100-self.fee_percentage)/100;
 			}
 		} else {
 			for (_, orderbook) in self.orderbooks.iter() {
@@ -259,9 +260,10 @@ impl Market {
 			}
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
 			let winning_value = winning_orderbook.calc_claimable_amt(from.to_string());
-			claimable += winning_value * (100-self.fee_percentage);
+			claimable += winning_value * (100-self.fee_percentage)/100;
 		}
 
+        println!("Claimable by {} before dispute_earnings: {}", from.to_string(), claimable);
 		// Claiming Dispute Earnings
         claimable += self.get_dispute_earnings(from.to_string());
 		return claimable;
@@ -282,6 +284,7 @@ impl Market {
                 resolute_claimable += dispute.2;
             }
         }
+        if total_correctly_staked == 0 {return 0}
         return user_correctly_staked / total_correctly_staked * resolute_claimable;
 	}
 

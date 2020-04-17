@@ -80,10 +80,10 @@ fn test_categorical_market_automated_matcher() {
 	// println!("____________________________________________________");
 
 	// assertions for the orderbook lengths
-	assert_eq!(open_0_orders.len(), 1);
-	assert_eq!(open_1_orders.len(), 1);
-	assert_eq!(open_2_orders.len(), 1);
-	assert_eq!(filled_0_orders.len(), 1);
-	assert_eq!(filled_1_orders.len(), 0);
-	assert_eq!(filled_2_orders.len(), 0);
+	assert_eq!(open_0_orders.len(), 0);
+	assert_eq!(open_1_orders.len(), 0);
+	assert_eq!(open_2_orders.len(), 0);
+	assert_eq!(filled_0_orders.len(), 2);
+	assert_eq!(filled_1_orders.len(), 2);
+	assert_eq!(filled_2_orders.len(), 1);
 }

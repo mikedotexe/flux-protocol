@@ -20,6 +20,7 @@ fn test_invalid_market_payout_calc() {
 	contract.place_order(0, 2, 2000, 20);
 
 	testing_env!(get_context(carol(), market_end_timestamp()));
+	println!("{}", market_end_timestamp());
 	contract.resolute(0, None);
 
 	let claimable_carol = contract.get_claimable(0, carol());
