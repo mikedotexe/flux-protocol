@@ -30,7 +30,7 @@ pub struct Market {
 	pub winning_outcome: Option<u64>,
 	pub resoluted: bool,
 	pub liquidity: u128,
-	pub disputed: bool,
+	pub finalized_block: u64,
 	pub dispute_thresh: u128,
 	pub dispute_round: u64,
 	pub finalized: bool,
@@ -64,7 +64,7 @@ impl Market {
 			winning_outcome: None,
 			resoluted: false,
 			liquidity: 0,
-			disputed: false,
+			finalized_block: 0,
 			dispute_thresh: 0,
 			finalized: false,
 			fee_percentage,
@@ -176,6 +176,7 @@ impl Market {
 		// TODO: Make sure market can only be resoluted after end time
 		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false);
+		assert_eq!(self.finalized, false);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
 
         self.winning_outcome = winning_outcome;
@@ -206,7 +207,10 @@ impl Market {
 
 	pub fn dispute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) -> u128{
 	    assert_eq!(self.resoluted, true);
+	    assert_eq!(self.finalized, false);
         assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome);
+        assert!(env::block_index() < self.finalized_block);
+
         if self.dispute_round == 0 {
             self.dispute_thresh = self.get_resolute_bond();
             self.dispute_round = 1;
@@ -218,7 +222,8 @@ impl Market {
             return_amount = bond + progress - self.dispute_thresh;
             self.dispute_thresh *= 2;
             self.winning_outcome = winning_outcome;
-            self.disputed = true;
+            // TODO: Pick better block finalization amount
+            self.finalized_block = env::block_index() + 10;
             self.dispute_round += 1;
         } else {
            let round_resolvers = self.resolvers.entry(self.dispute_round).or_insert(Vec::new());
@@ -229,9 +234,7 @@ impl Market {
 
 	pub fn finalize(&mut self) {
 	    assert_eq!(self.resoluted, true);
-	    if self.disputed {
-	        self.disputed = false;
-	    } else {
+	    if env::block_index() > self.finalized_block {
 	        self.finalized = true;
 	    }
 	}
