@@ -17,8 +17,6 @@ fn test_payout() {
 
 	testing_env!(get_context(carol(), market_end_timestamp()));
 	contract.resolute(0, Some(0));
-	testing_env!(get_context(carol(), market_end_timestamp()+10));
-    contract.finalize(0);
 
 	let initially_claimable_carol = contract.get_claimable(0, carol());
 	let initially_claimable_alice = contract.get_claimable(0, alice());
@@ -27,7 +25,7 @@ fn test_payout() {
 	let initial_balance_alice = contract.get_fdai_balance(alice());
 
 	contract.claim_earnings(0, carol());
-	testing_env!(get_context(alice(), market_end_timestamp()+10));
+	testing_env!(get_context(alice(), market_end_timestamp()));
 	contract.claim_earnings(0, alice());
 
 	let claimable_after_claim_carol = contract.get_claimable(0, carol());
