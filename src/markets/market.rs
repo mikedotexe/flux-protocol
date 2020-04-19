@@ -81,9 +81,9 @@ impl Market {
 		assert_eq!(self.resoluted, false);
 		assert!(env::block_timestamp() < self.end_time);
 		// TODO: NOTE==THIS IS WHERE THE ROUNDING PREVIOUSLY HAPPENED
-		let (spend_filled, shares_filled) = self.fill_matches(outcome, spend, price);
-		let total_spend = spend - spend_filled;
-		self.liquidity += spend_filled;
+		let (spend_left, shares_filled) = self.fill_matches(outcome, spend, price);
+		let total_spend = spend - spend_left;
+		self.liquidity += total_spend;
 		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
