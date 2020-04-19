@@ -73,7 +73,7 @@ impl Markets {
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
 		// TODO check if end_time hasn't happened yet
 		let from = env::predecessor_account_id();
-		println!("Contract being created from: {}", from.to_string());
+		//println!("Contract being created from: {}", from.to_string());
 		// TODO: Escrow bond from creator's account
 		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, categories, end_time, fee_percentage, cost_percentage, api_source);
 		let market_id = new_market.id;

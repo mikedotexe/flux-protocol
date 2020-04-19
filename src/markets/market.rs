@@ -248,7 +248,6 @@ impl Market {
         // Claiming fees
         if from == self.creator {
             claimable += self.liquidity * (self.fee_percentage)/100;
-            println!("Fees collected by carol: {}", claimable);
         }
 
         // Claiming payouts
@@ -266,7 +265,6 @@ impl Market {
 			claimable += winning_value * (100-self.fee_percentage)/100;
 		}
 
-        println!("Claimable by {} before dispute_earnings: {}", from.to_string(), claimable);
 		// Claiming Dispute Earnings
         claimable += self.get_dispute_earnings(from.to_string());
 		return claimable;

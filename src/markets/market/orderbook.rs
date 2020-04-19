@@ -137,7 +137,6 @@ impl Orderbook {
 			// Iteratively fill market orders until done
             for (order_id, _) in current_order_map.iter_mut() {
 				let order = self.open_orders.get_mut(&order_id).unwrap();
-				// println!("get here: {:?}, {:?}", order_id, self.open_orders);
                 if amt_of_shares_to_fill > 0 {
                     let shares_remaining_in_order = order.amt_of_shares - order.shares_filled;
 					let filling = cmp::min(shares_remaining_in_order, amt_of_shares_to_fill);
