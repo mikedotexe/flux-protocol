@@ -29,9 +29,9 @@ pub struct Market {
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub winning_outcome: Option<u64>,
 	pub resoluted: bool,
+	pub resolute_bond: u128,
 	pub liquidity: u128,
-	pub finalized_block: u64,
-	pub dispute_thresh: u128,
+	pub disputed: bool,
 	pub dispute_round: u64,
 	pub finalized: bool,
 	pub fee_percentage: u128,
@@ -43,7 +43,6 @@ pub struct Market {
 impl Market {
 	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64, fee_percentage: u128, cost_percentage: u128, api_source: String) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
-		// TODO get blocktime at creation
 
 		for i in 0..outcomes {
 			empty_orderbooks.insert(i, Orderbook::new(i));
@@ -63,9 +62,9 @@ impl Market {
 			orderbooks: empty_orderbooks,
 			winning_outcome: None,
 			resoluted: false,
+			resolute_bond: 5,
 			liquidity: 0,
-			finalized_block: 0,
-			dispute_thresh: 0,
+			disputed: false,
 			finalized: false,
 			fee_percentage,
 			cost_percentage,
@@ -80,10 +79,9 @@ impl Market {
 		assert!(price > 0 && price < 100);
 		assert_eq!(self.resoluted, false);
 		assert!(env::block_timestamp() < self.end_time);
-		// TODO: NOTE==THIS IS WHERE THE ROUNDING PREVIOUSLY HAPPENED
 		let (spend_left, shares_filled) = self.fill_matches(outcome, spend, price);
 		let total_spend = spend - spend_left;
-		self.liquidity += total_spend;
+		self.liquidity += shares_filled * price * (100/price);
 		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
@@ -183,65 +181,41 @@ impl Market {
         self.resoluted = true;
 
         // Insert (outcome, round, stake)
-        let bond = self.get_resolute_bond();
+        let bond = self.resolute_bond;
         let resolution = self.resolvers.entry(0).or_insert(Vec::new());
         resolution.push((from, winning_outcome, bond));
         self.dispute_round = 0;
 	}
 
-	pub fn get_resolute_bond(&self) -> u128 {
-	    return self.liquidity * self.cost_percentage;
-	}
-
-	pub fn get_dispute_progress(&mut self, winning_outcome: Option<u64>) -> u128 {
-	    let round_disputes = self.resolvers.entry(self.dispute_round).or_insert(Vec::new());
-        let mut progress = 0;
-
-        for value in round_disputes.iter() {
-            if value.1 == winning_outcome {
-                progress += value.2;
-            }
-        }
-        return progress;
-	}
-
 	pub fn dispute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) -> u128{
 	    assert_eq!(self.resoluted, true);
+	    assert_eq!(self.disputed, false);
 	    assert_eq!(self.finalized, false);
         assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome);
-        assert!(env::block_index() < self.finalized_block);
 
-        if self.dispute_round == 0 {
-            self.dispute_thresh = self.get_resolute_bond();
-            self.dispute_round = 1;
-        }
-
-        let progress = self.get_dispute_progress(winning_outcome);
         let mut return_amount = 0;
-        if bond + progress >= self.dispute_thresh {
-            return_amount = bond + progress - self.dispute_thresh;
-            self.dispute_thresh *= 2;
-            self.winning_outcome = winning_outcome;
-            // TODO: Pick better block finalization amount
-            self.finalized_block = env::block_index() + 10;
-            self.dispute_round += 1;
-        } else {
-           let round_resolvers = self.resolvers.entry(self.dispute_round).or_insert(Vec::new());
-           round_resolvers.push((from, winning_outcome, bond));
+        if bond >= self.resolute_bond {
+            return_amount = bond - self.resolute_bond;
+            self.disputed = true;
+            let round_resolvers = self.resolvers.entry(1).or_insert(Vec::new());
+            round_resolvers.push((from, winning_outcome, self.resolute_bond));
         }
         return return_amount;
 	}
 
-	pub fn finalize(&mut self) {
+	pub fn finalize(&mut self, from: String,  winning_outcome: Option<u64>) {
 	    assert_eq!(self.resoluted, true);
-	    if env::block_index() > self.finalized_block {
-	        self.finalized = true;
+	    assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
+        // TODO: Hardcode Judge's account
+        //assert_eq!(from, )
+	    if self.disputed {
+            self.winning_outcome = winning_outcome;
 	    }
+	    self.finalized = true;
 	}
 
 	pub fn get_claimable(&self, from: String) -> u128 {
 		assert_eq!(self.resoluted, true);
-		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 
@@ -263,7 +237,7 @@ impl Market {
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
 			let winning_value = winning_orderbook.calc_claimable_amt(from.to_string());
 			claimable += winning_value * (100-self.fee_percentage)/100;
-		}
+        }
 
 		// Claiming Dispute Earnings
         claimable += self.get_dispute_earnings(from.to_string());
@@ -271,7 +245,7 @@ impl Market {
 	}
 
 	fn get_dispute_earnings(&self, from: String) -> u128 {
-        let mut resolute_claimable = self.get_resolute_bond();
+        let mut resolute_claimable = 0;
         let mut user_correctly_staked = 0;
         let mut total_correctly_staked = 0;
         for (round, round_vec) in self.resolvers.iter() {
@@ -380,6 +354,23 @@ impl Market {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
 			orderbook.delete_orders_for(from.to_string());
 		}
+	}
+
+	pub fn delete_resolution_for(&mut self, from: String) {
+	     let rounds_to_delete = &mut vec![];
+
+	     for (round, round_vec) in self.resolvers.iter_mut() {
+             for dispute in round_vec.iter() {
+                 if dispute.0 == from {
+                     rounds_to_delete.push(*round);
+                 }
+             }
+         }
+
+
+         for round in rounds_to_delete {
+            self.resolvers.remove(&round);
+         }
 	}
 }
 

@@ -24,6 +24,7 @@ fn test_payout() {
 	let initial_balance_carol = contract.get_fdai_balance(carol());
 	let initial_balance_alice = contract.get_fdai_balance(alice());
 
+    contract.finalize_market(0, Some(0));
 	contract.claim_earnings(0, carol());
 	testing_env!(get_context(alice(), market_end_timestamp()));
 	contract.claim_earnings(0, alice());

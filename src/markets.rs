@@ -114,8 +114,9 @@ impl Markets {
 	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
 		let from = env::predecessor_account_id();
 		let market = self.active_markets.get_mut(&market_id).unwrap();
+		assert_eq!(market.resoluted, false);
 
-		let bond = market.get_resolute_bond();
+		let bond = market.resolute_bond;
 		let balance = self.fdai_balances.get(&from).unwrap();
         assert!(balance >= &bond);
 
@@ -126,13 +127,18 @@ impl Markets {
 	pub fn dispute(&mut self, market_id: u64, winning_outcome: Option<u64>, bond: u128) {
 	    let from = env::predecessor_account_id();
         let market = self.active_markets.get_mut(&market_id).unwrap();
+        assert_eq!(market.resoluted, true);
+        assert_eq!(market.disputed, false);
+
         let return_amount = market.dispute(from, winning_outcome, bond);
         self.subtract_balance(bond-return_amount);
 	}
 
-	pub fn finalize_market(&mut self, market_id: u64) {
+	pub fn finalize_market(&mut self, market_id: u64, winning_outcome: Option<u64>) {
 	    let market = self.active_markets.get_mut(&market_id).unwrap();
-        market.finalize();
+	    assert_eq!(market.resoluted, true);
+	    //assert_eq!(env::predecessor_account_id(), )
+        market.finalize(env::predecessor_account_id(), winning_outcome);
 	}
 
 	fn subtract_balance(&mut self, amount: u128) {
@@ -177,9 +183,11 @@ impl Markets {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert!(env::block_timestamp() >= market.end_time, "market hasn't ended yet");
 		assert_eq!(market.resoluted, true);
+		assert_eq!(market.finalized, true);
 
 		let claimable = market.get_claimable(account_id.to_string());
 		market.delete_orders_for(account_id.to_string());
+		market.delete_resolution_for(account_id.to_string());
 
 		self.add_balance(claimable);
 	}
@@ -245,7 +253,7 @@ impl Default for Markets {
 			fdai_in_protocol: 0,
 			fdai_outside_escrow: 0,
 			user_count: 0,
-			max_fee_percentage: 0,
+			max_fee_percentage: 5,
 			creation_bond: 0,
 		}
 	}
@@ -320,4 +328,5 @@ mod tests {
 	mod market_resolution_tests;
 	mod claim_earnings_tests;
 	mod market_depth_tests;
+	mod market_dispute_tests;
 }

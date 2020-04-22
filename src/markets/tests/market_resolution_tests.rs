@@ -24,7 +24,7 @@ fn test_invalid_market_payout_calc() {
 
 	let claimable_carol = contract.get_claimable(0, carol());
 	let claimable_alice = contract.get_claimable(0, alice());
-	assert_eq!(claimable_carol, 10000);
+	assert_eq!(claimable_carol, 10005);
 	assert_eq!(claimable_alice, 10000);
 
 	let open_orders_0 = contract.get_open_orders(0, 0);
@@ -85,6 +85,6 @@ fn test_valid_market_payout_calc() {
 	let claimable_carol = contract.get_claimable(0, carol()) ;
 	let claimable_alice = contract.get_claimable(0, alice()) ;
 
-	assert_eq!(claimable_carol, 0);
+	assert_eq!(claimable_carol, 5);
 	assert_eq!(claimable_alice, 10000);
 }
