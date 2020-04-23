@@ -9,10 +9,6 @@ pub mod orderbook;
 type Orderbook = orderbook::Orderbook;
 type Order = orderbook::Order;
 
-// TODO: Endtime has to be in blocks instead of ms / s
-// TODO: Add resolution_url
-// TODO: When filling an order for a price > market price the tx fails
-// TODO: Share denomination seems off by 1 decimal - don't know if frontend or backend fix
 #[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Market {

@@ -1,7 +1,9 @@
 use std::string::String;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
+use near_sdk::{near_bindgen, env};
 
+#[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug, Clone)]
 pub struct Order {
 	pub id: u128,
@@ -12,11 +14,13 @@ pub struct Order {
 	pub price: u128,
 	pub filled: u128,
 	pub shares_filled: u128,
+	pub creation_time: u128,
 }
-
 
 impl Order {
 	pub fn new(creator: String, outcome: u64, id: u128, spend:u128, amt_of_shares: u128, price: u128, filled: u128, shares_filled: u128) -> Self {
+		let creation_time = env::block_timestamp() / 1000000;
+
 		Order {
 			id,
 			creator,
@@ -26,6 +30,7 @@ impl Order {
 			price,
 			filled,
 			shares_filled,
+			creation_time: creation_time as u128
 		}
 	}
 }
