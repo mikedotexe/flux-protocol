@@ -25,13 +25,20 @@ pub struct Market {
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
 	pub winning_outcome: Option<u64>,
 	pub resoluted: bool,
-	pub liquidity: u128
+	pub resolute_bond: u128,
+	pub liquidity: u128,
+	pub disputed: bool,
+	pub dispute_round: u64,
+	pub finalized: bool,
+	pub fee_percentage: u128,
+	pub cost_percentage: u128,
+	pub api_source: String,
+	pub resolvers: BTreeMap<u64, Vec<(String, Option<u64>, u128)>>, // round to (resolver id, outcome, stake)
 }
 
 impl Market {
-	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> Self {
+	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64, fee_percentage: u128, cost_percentage: u128, api_source: String) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
-		// TODO get blocktime at creation
 
 		for i in 0..outcomes {
 			empty_orderbooks.insert(i, Orderbook::new(i));
@@ -51,7 +58,15 @@ impl Market {
 			orderbooks: empty_orderbooks,
 			winning_outcome: None,
 			resoluted: false,
-			liquidity: 0
+			resolute_bond: 5,
+			liquidity: 0,
+			disputed: false,
+			finalized: false,
+			fee_percentage,
+			cost_percentage,
+			api_source,
+			resolvers: BTreeMap::new(),
+			dispute_round: 0,
 		}
 	}
 
@@ -59,11 +74,10 @@ impl Market {
 		assert!(spend > 0);
 		assert!(price > 0 && price < 100);
 		assert_eq!(self.resoluted, false);
-		assert!(env::block_timestamp() / 1000000 < self.end_time);
-
+		assert!(env::block_timestamp() < self.end_time);
 		let (spend_left, shares_filled) = self.fill_matches(outcome, spend, price);
 		let total_spend = spend - spend_left;
-		self.liquidity += spend;
+		self.liquidity += shares_filled * price * (100/price);
 		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
@@ -73,7 +87,7 @@ impl Market {
 		let mut market_price = self.get_market_price(outcome);
 		if market_price > price { return (spend,0) }
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
-		
+
 		let mut shares_filled = 0;
 		let mut spendable = spend;
 
@@ -81,11 +95,10 @@ impl Market {
 			let mut shares_to_fill = spendable / market_price;
 			let shares_fillable = self.get_min_shares_fillable(outcome);
 			self.last_price_for_outcomes.insert(outcome, market_price);
-			
+
 			if shares_fillable < shares_to_fill {
 				shares_to_fill = shares_fillable;
-			}
-			
+            }
 			for orderbook_id in &orderbook_ids {
 				let orderbook = self.orderbooks.get_mut(orderbook_id).unwrap();
 				if !orderbook.best_price.is_none() {
@@ -94,7 +107,7 @@ impl Market {
 					orderbook.fill_best_orders(shares_to_fill);
 				}
 			}
-			
+
 			spendable -= shares_to_fill * market_price;
 			shares_filled += shares_to_fill;
 			market_price = self.get_market_price(outcome);
@@ -152,32 +165,97 @@ impl Market {
 		return orderbooks;
 	}
 
-	pub fn resolute(&mut self,from: String, winning_outcome: Option<u64>) {
+
+	pub fn resolute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) {
 		// TODO: Make sure market can only be resoluted after end time
-		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
+		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false);
-		assert_eq!(from, self.creator);
+		assert_eq!(self.finalized, false);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
-		self.winning_outcome = winning_outcome;
-		self.resoluted = true;
+
+        self.winning_outcome = winning_outcome;
+        self.resoluted = true;
+
+        // Insert (outcome, round, stake)
+        let bond = self.resolute_bond;
+        let resolution = self.resolvers.entry(0).or_insert(Vec::new());
+        resolution.push((from, winning_outcome, bond));
+        self.dispute_round = 0;
+	}
+
+	pub fn dispute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) -> u128{
+	    assert_eq!(self.resoluted, true);
+	    assert_eq!(self.disputed, false);
+	    assert_eq!(self.finalized, false);
+        assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome);
+
+        let mut return_amount = 0;
+        if bond >= self.resolute_bond {
+            return_amount = bond - self.resolute_bond;
+            self.disputed = true;
+            let round_resolvers = self.resolvers.entry(1).or_insert(Vec::new());
+            round_resolvers.push((from, winning_outcome, self.resolute_bond));
+        }
+        return return_amount;
+	}
+
+	pub fn finalize(&mut self, from: String,  winning_outcome: Option<u64>) {
+	    assert_eq!(self.resoluted, true);
+	    assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
+        // TODO: Hardcode Judge's account
+        //assert_eq!(from, )
+	    if self.disputed {
+            self.winning_outcome = winning_outcome;
+	    }
+	    self.finalized = true;
 	}
 
 	pub fn get_claimable(&self, from: String) -> u128 {
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 
+        // Claiming fees
+        if from == self.creator {
+            claimable += self.liquidity * (self.fee_percentage)/100;
+        }
+
+        // Claiming payouts
 		if invalid {
 			for (_, orderbook) in self.orderbooks.iter() {
-				claimable += orderbook.get_spend_by(from.to_string());
+			    let spent = orderbook.get_spend_by(from.to_string());
+				claimable += spent * (100-self.fee_percentage)/100;
 			}
 		} else {
 			for (_, orderbook) in self.orderbooks.iter() {
 				claimable += orderbook.get_open_order_value_for(from.to_string());
 			}
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
-			claimable += winning_orderbook.calc_claimable_amt(from);
-		}
+			let winning_value = winning_orderbook.calc_claimable_amt(from.to_string());
+			claimable += winning_value * (100-self.fee_percentage)/100;
+        }
+
+		// Claiming Dispute Earnings
+        claimable += self.get_dispute_earnings(from.to_string());
 		return claimable;
+	}
+
+	fn get_dispute_earnings(&self, from: String) -> u128 {
+        let mut resolute_claimable = 0;
+        let mut user_correctly_staked = 0;
+        let mut total_correctly_staked = 0;
+        for (round, round_vec) in self.resolvers.iter() {
+            for dispute in round_vec.iter() {
+                if dispute.0 == from && dispute.1 == self.winning_outcome {
+                    user_correctly_staked += dispute.2;
+                }
+                if dispute.1 == self.winning_outcome {
+                    total_correctly_staked += dispute.2;
+                }
+                resolute_claimable += dispute.2;
+            }
+        }
+        if total_correctly_staked == 0 {return 0}
+        return user_correctly_staked / total_correctly_staked * resolute_claimable;
 	}
 
     // Updates the best price for an order once initial best price is filled
@@ -271,6 +349,23 @@ impl Market {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
 			orderbook.delete_orders_for(from.to_string());
 		}
+	}
+
+	pub fn delete_resolution_for(&mut self, from: String) {
+	     let rounds_to_delete = &mut vec![];
+
+	     for (round, round_vec) in self.resolvers.iter_mut() {
+             for dispute in round_vec.iter() {
+                 if dispute.0 == from {
+                     rounds_to_delete.push(*round);
+                 }
+             }
+         }
+
+
+         for round in rounds_to_delete {
+            self.resolvers.remove(&round);
+         }
 	}
 }
 

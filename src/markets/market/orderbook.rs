@@ -69,7 +69,7 @@ impl Orderbook {
 		// Insert into order tree
 		let orders_at_price = self.orders_by_price.entry(price).or_insert(HashMap::new());
 		*self.liquidity_by_price.entry(price).or_insert(0) += left_to_spend;
-		
+
 		orders_at_price.insert(order_id, true);
 
 		self.orders_by_user.entry(from.to_string()).or_insert(Vec::new()).push(order_id);
@@ -93,21 +93,21 @@ impl Orderbook {
 	pub fn remove_order(&mut self, order_id: u128) -> u128 {
 		// Store copy of order to remove
 		let order = self.open_orders.get_mut(&order_id).unwrap().clone();
-		
+
 		// Remove original order from open_orders
 		self.open_orders.remove(&order.id);
-		
+
 		let outstanding_spend = order.spend - order.filled;
-		
+
         *self.spend_by_user.get_mut(&order.creator).unwrap() -= outstanding_spend;
 		*self.liquidity_by_price.entry(order.price).or_insert(0) -= outstanding_spend;
-		
+
         // Add back to filled if eligible, remove from user map if not
         if order.shares_filled > 0 {
 			self.filled_orders.insert(order.id, order.clone());
         } else {
 			let order_by_user_vec = self.orders_by_user.get_mut(&order.creator).unwrap();
-			
+
 			// Keep all orders that aren't order_id using the retain method
             order_by_user_vec.retain(|owned_order_id| &order_id != owned_order_id);
             if order_by_user_vec.is_empty() {
@@ -137,11 +137,10 @@ impl Orderbook {
 			// Iteratively fill market orders until done
             for (order_id, _) in current_order_map.iter_mut() {
 				let order = self.open_orders.get_mut(&order_id).unwrap();
-				// println!("get here: {:?}, {:?}", order_id, self.open_orders);
                 if amt_of_shares_to_fill > 0 {
                     let shares_remaining_in_order = order.amt_of_shares - order.shares_filled;
 					let filling = cmp::min(shares_remaining_in_order, amt_of_shares_to_fill);
-					
+
 					*self.liquidity_by_price.entry(order.price).or_insert(0) -= filling * order.price;
 
                     order.shares_filled += filling;
@@ -230,8 +229,8 @@ impl Orderbook {
 	pub fn get_spend_by(&self, from: String) -> u128 {
 		return *self.spend_by_user.get(&from).unwrap_or(&0);
 	}
-	
-	pub fn get_liquidity(&self, price: u128) -> u128 {
+
+	pub fn get_liquidity_for_price(&self, price: u128) -> u128 {
 		let spend_liquidity = *self.liquidity_by_price.get(&price).unwrap_or(&0);
 		if spend_liquidity == 0 {
 			return 0
