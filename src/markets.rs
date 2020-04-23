@@ -214,14 +214,14 @@ impl Markets {
 
 	pub fn get_depth(&self, market_id: u64, outcome: u64, spend: u128, price: u128) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
-		return market.get_liquidity(outcome, spend, price);
+		return market.get_liquidity_available(outcome, spend, price);
 	}
 
 	pub fn get_liquidity(&self, market_id: u64, outcome: u64, price: u128) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 
-		return orderbook.get_liquidity(price);
+		return orderbook.get_liquidity_at_price(price);
 	}
 
 	pub fn get_market(&self, id: u64) -> &Market {
