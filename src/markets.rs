@@ -180,9 +180,11 @@ impl Markets {
 		market_id: u64, 
 		winning_outcome: Option<u64>
 	) {
-	    let market = self.active_markets.get_mut(&market_id).unwrap();
-	    assert_eq!(market.resoluted, true);
-	    //assert_eq!(env::predecessor_account_id(), )
+		let market = self.active_markets.get_mut(&market_id).unwrap();
+		assert_eq!(market.resoluted, true);
+		if market.disputed {
+			assert_eq!(env::predecessor_account_id(), self.owner);
+		}
         market.finalize(env::predecessor_account_id(), winning_outcome);
 	}
 

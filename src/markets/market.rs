@@ -250,9 +250,7 @@ impl Market {
 		winning_outcome: Option<u64>
 	) {
 	    assert_eq!(self.resoluted, true);
-	    assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
-        // TODO: Hardcode Judge's account
-        //assert_eq!(from, )
+		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
 	    if self.disputed {
             self.winning_outcome = winning_outcome;
 	    }
