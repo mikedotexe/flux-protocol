@@ -37,7 +37,19 @@ pub struct Market {
 }
 
 impl Market {
-	pub fn new(id: u64, from: String, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64, fee_percentage: u128, cost_percentage: u128, api_source: String) -> Self {
+	pub fn new(
+		id: u64, 
+		from: String, 
+		description: String, 
+		extra_info: String, 
+		outcomes: u64, 
+		outcome_tags: Vec<String>, 
+		categories: Vec<String>, 
+		end_time: u64, 
+		fee_percentage: u128, 
+		cost_percentage: u128, 
+		api_source: String
+	) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
 
 		for i in 0..outcomes {
@@ -70,7 +82,14 @@ impl Market {
 		}
 	}
 
-	pub fn place_order(&mut self, from: String, outcome: u64, amt_of_shares: u128, spend: u128, price: u128) {
+	pub fn place_order(
+		&mut self, 
+		from: String, 
+		outcome: u64, 
+		amt_of_shares: u128, 
+		spend: u128, 
+		price: u128
+	) {
 		assert!(spend > 0);
 		assert!(price > 0 && price < 100);
 		assert_eq!(self.resoluted, false);
@@ -83,7 +102,12 @@ impl Market {
 		orderbook.place_order(from, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
 	}
 
-	fn fill_matches(&mut self, outcome: u64, spend: u128, price: u128) -> (u128, u128) {
+	fn fill_matches(
+		&mut self, 
+		outcome: u64, 
+		spend: u128, 
+		price: u128
+	) -> (u128, u128) {
 		let mut market_price = self.get_market_price(outcome);
 		if market_price > price { return (spend,0) }
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
@@ -116,7 +140,10 @@ impl Market {
 		return (spendable, shares_filled);
 	}
 
-	pub fn get_min_shares_fillable(&self, outcome: u64) -> u128 {
+	pub fn get_min_shares_fillable(
+		&self, 
+		outcome: u64
+	) -> u128 {
 		let mut shares = None;
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		for orderbook_id in orderbook_ids {
@@ -129,7 +156,9 @@ impl Market {
 		return shares.unwrap();
 	}
 
-	pub fn get_market_prices(&self) -> BTreeMap<u64, u128> {
+	pub fn get_market_prices(
+		&self
+	) -> BTreeMap<u64, u128> {
 		let mut market_prices: BTreeMap<u64, u128> = BTreeMap::new();
 		for outcome in 0..self.outcomes {
 			let market_price = self.get_market_price(outcome);
@@ -138,7 +167,10 @@ impl Market {
 		return market_prices;
 	}
 
-	pub fn get_market_price(&self, outcome: u64) -> u128 {
+	pub fn get_market_price(
+		&self, 
+		outcome: u64
+	) -> u128 {
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		let mut market_price = 100;
 
@@ -153,7 +185,10 @@ impl Market {
 		return market_price;
 	}
 
-	fn get_inverse_orderbook_ids(&self, principle_outcome: u64) -> Vec<u64> {
+	fn get_inverse_orderbook_ids(
+		&self, 
+		principle_outcome: u64
+	) -> Vec<u64> {
 		let mut orderbooks = vec![];
 
 		for i in 0..self.outcomes {
@@ -166,7 +201,12 @@ impl Market {
 	}
 
 
-	pub fn resolute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) {
+	pub fn resolute(
+		&mut self, 
+		from: String, 
+		winning_outcome: Option<u64>, 
+		bond: u128
+	) {
 		// TODO: Make sure market can only be resoluted after end time
 		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false);
@@ -183,7 +223,12 @@ impl Market {
         self.dispute_round = 0;
 	}
 
-	pub fn dispute(&mut self, from: String, winning_outcome: Option<u64>, bond: u128) -> u128{
+	pub fn dispute(
+		&mut self, 
+		from: String, 
+		winning_outcome: Option<u64>, 
+		bond: u128
+	) -> u128{
 	    assert_eq!(self.resoluted, true);
 	    assert_eq!(self.disputed, false);
 	    assert_eq!(self.finalized, false);
@@ -199,7 +244,11 @@ impl Market {
         return return_amount;
 	}
 
-	pub fn finalize(&mut self, from: String,  winning_outcome: Option<u64>) {
+	pub fn finalize(
+		&mut self, 
+		from: String,  
+		winning_outcome: Option<u64>
+	) {
 	    assert_eq!(self.resoluted, true);
 	    assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
         // TODO: Hardcode Judge's account
@@ -210,7 +259,10 @@ impl Market {
 	    self.finalized = true;
 	}
 
-	pub fn get_claimable(&self, from: String) -> u128 {
+	pub fn get_claimable(
+		&self, 
+		from: String
+	) -> u128 {
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 
@@ -239,7 +291,10 @@ impl Market {
 		return claimable;
 	}
 
-	fn get_dispute_earnings(&self, from: String) -> u128 {
+	fn get_dispute_earnings(
+		&self, 
+		from: String
+	) -> u128 {
         let mut resolute_claimable = 0;
         let mut user_correctly_staked = 0;
         let mut total_correctly_staked = 0;
@@ -259,7 +314,15 @@ impl Market {
 	}
 
     // Updates the best price for an order once initial best price is filled
-	fn update_next_best_price(&self, inverse_orderbook_ids: &Vec<u64>, first_iteration: &bool, outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, best_order_exists: &mut bool, market_price: &mut u128, lowest_liquidity: &u128) {
+	fn update_next_best_price(
+		&self, 
+		inverse_orderbook_ids: &Vec<u64>, 
+		first_iteration: &bool, 
+		outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, 
+		best_order_exists: &mut bool, 
+		market_price: &mut u128, 
+		lowest_liquidity: &u128
+	) {
 	    for orderbook_id in inverse_orderbook_ids {
             let orderbook = self.orderbooks.get(&orderbook_id).unwrap();
             if !first_iteration {
@@ -287,7 +350,14 @@ impl Market {
 	}
 
     // Updates the lowest liquidity available amongst best prices
-	fn update_lowest_liquidity(&self, inverse_orderbook_ids: &Vec<u64>, first_iteration: &bool, lowest_liquidity: &mut u128, outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, best_order_exists: &mut bool) {
+	fn update_lowest_liquidity(
+		&self, 
+		inverse_orderbook_ids: &Vec<u64>, 
+		first_iteration: &bool, 
+		lowest_liquidity: &mut u128, 
+		outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, 
+		best_order_exists: &mut bool
+	) {
 	    *best_order_exists = false;
 	    for orderbook_id in inverse_orderbook_ids {
             // Get lowest liquidity at new price
@@ -308,7 +378,12 @@ impl Market {
 	}
 
 	// TODO: Add get_liquidity function that doesn't need the spend argument
-	pub fn get_liquidity_available(&self, outcome: u64, spend: u128, price: u128) -> u128 {
+	pub fn get_liquidity_available(
+		&self, 
+		outcome: u64, 
+		spend: u128, 
+		price: u128
+	) -> u128 {
 		let inverse_orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 		// Mapped outcome to price and liquidity left
 		let mut outcome_to_price_share_pointer: HashMap<u64,  (u128, u128)> = HashMap::new();
@@ -344,14 +419,20 @@ impl Market {
 	}
 
 
-	pub fn delete_orders_for(&mut self, from: String) {
+	pub fn delete_orders_for(
+		&mut self, 
+		from: String
+	) {
 		for orderbook_id in 0..self.outcomes {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
 			orderbook.delete_orders_for(from.to_string());
 		}
 	}
 
-	pub fn delete_resolution_for(&mut self, from: String) {
+	pub fn delete_resolution_for(
+		&mut self, 
+		from: String
+	) {
 	     let rounds_to_delete = &mut vec![];
 
 	     for (round, round_vec) in self.resolvers.iter_mut() {
@@ -361,7 +442,6 @@ impl Market {
                  }
              }
          }
-
 
          for round in rounds_to_delete {
             self.resolvers.remove(&round);

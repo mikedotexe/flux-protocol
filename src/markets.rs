@@ -25,13 +25,18 @@ struct Markets {
 #[near_bindgen]
 impl Markets {
 
-	fn dai_token(&self) -> u128 {
+	fn dai_token(
+		&self
+	) -> u128 {
 		let base: u128 = 10;
 		return base.pow(17);
 	}
 
 	// This is a demo method, it mints a currency to interact with markets until we have NDAI
-	pub fn add_to_creators_funds(&mut self, amount: u128) {
+	pub fn add_to_creators_funds(
+		&mut self, 
+		amount: u128
+	) {
 		let from = env::predecessor_account_id();
 		assert_eq!(from, self.creator);
 
@@ -43,7 +48,9 @@ impl Markets {
 	}
 
 	// This is a demo method, it mints a currency to interact with markets until we have NDAI
-	pub fn claim_fdai(&mut self) {
+	pub fn claim_fdai(
+		&mut self
+	) {
 		let from = env::predecessor_account_id();
 		let can_claim = self.fdai_balances.get(&from).is_none();
 		assert!(can_claim, "user has already claimed fdai");
@@ -61,7 +68,18 @@ impl Markets {
 		return *self.fdai_balances.get(&from).unwrap();
 	}
 
-	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64, fee_percentage: u128, cost_percentage: u128, api_source: String) -> u64 {
+	pub fn create_market(
+		&mut self, 
+		description: String, 
+		extra_info: String, 
+		outcomes: u64,
+		outcome_tags: Vec<String>,
+		categories: Vec<String>,
+		end_time: u64,
+		fee_percentage: u128,
+		cost_percentage: u128,
+		api_source: String
+	) -> u64 {
 		assert!(outcomes > 1);
 		assert!(outcomes == 2 || outcomes == outcome_tags.len() as u64);
 		assert!(outcomes < 20); // up for change
@@ -73,7 +91,7 @@ impl Markets {
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
 		// TODO check if end_time hasn't happened yet
 		let from = env::predecessor_account_id();
-		//println!("Contract being created from: {}", from.to_string());
+
 		// TODO: Escrow bond from creator's account
 		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, categories, end_time, fee_percentage, cost_percentage, api_source);
 		let market_id = new_market.id;
@@ -82,13 +100,22 @@ impl Markets {
 		return market_id;
 	}
 
-	pub fn delete_market(&mut self, market_id: u64) {
+	pub fn delete_market(
+		&mut self,
+		market_id: u64
+	) {
 		let from = env::predecessor_account_id();
 		assert_eq!(from, self.creator, "markets can only be deleted by the market creator");
 		self.active_markets.remove(&market_id);
 	}
 
-	pub fn place_order(&mut self, market_id: u64, outcome: u64, spend: u128, price: u128) {
+	pub fn place_order(
+		&mut self, 
+		market_id: u64, 
+		outcome: u64, 
+		spend: u128, 
+		price: u128
+	) {
 		let from = env::predecessor_account_id();
 		let balance = self.fdai_balances.get(&from).unwrap();
 		assert!(balance >= &spend);
@@ -101,7 +128,12 @@ impl Markets {
 		self.subtract_balance(rounded_spend);
 	}
 
-	pub fn cancel_order(&mut self, market_id: u64, outcome: u64, order_id: u128) {
+	pub fn cancel_order(
+		&mut self, 
+		market_id: u64, 
+		outcome: u64, 
+		order_id: u128
+	) {
 		let from = env::predecessor_account_id();
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, false);
@@ -111,7 +143,11 @@ impl Markets {
 		orderbook.remove_order(order_id);
     }
 
-	pub fn resolute(&mut self, market_id: u64, winning_outcome: Option<u64>) {
+	pub fn resolute(
+		&mut self, 
+		market_id: u64, 
+		winning_outcome: Option<u64>
+	) {
 		let from = env::predecessor_account_id();
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, false);
@@ -124,7 +160,12 @@ impl Markets {
 		self.subtract_balance(bond);
 	}
 
-	pub fn dispute(&mut self, market_id: u64, winning_outcome: Option<u64>, bond: u128) {
+	pub fn dispute(
+		&mut self, 
+		market_id: u64, 
+		winning_outcome: Option<u64>, 
+		bond: u128
+	) {
 	    let from = env::predecessor_account_id();
         let market = self.active_markets.get_mut(&market_id).unwrap();
         assert_eq!(market.resoluted, true);
@@ -134,14 +175,21 @@ impl Markets {
         self.subtract_balance(bond-return_amount);
 	}
 
-	pub fn finalize_market(&mut self, market_id: u64, winning_outcome: Option<u64>) {
+	pub fn finalize_market(
+		&mut self, 
+		market_id: u64, 
+		winning_outcome: Option<u64>
+	) {
 	    let market = self.active_markets.get_mut(&market_id).unwrap();
 	    assert_eq!(market.resoluted, true);
 	    //assert_eq!(env::predecessor_account_id(), )
         market.finalize(env::predecessor_account_id(), winning_outcome);
 	}
 
-	fn subtract_balance(&mut self, amount: u128) {
+	fn subtract_balance(
+		&mut self, 
+		amount: u128
+	) {
 		let from = env::predecessor_account_id();
 		let balance = self.fdai_balances.get(&from).unwrap();
 		let new_balance = *balance - amount;
@@ -152,7 +200,10 @@ impl Markets {
 		self.fdai_in_protocol= self.fdai_outside_escrow + amount as u128;
 	}
 
-	fn add_balance(&mut self, amount: u128) {
+	fn add_balance(
+		&mut self, 
+		amount: u128
+	) {
 		let from = env::predecessor_account_id();
 		let balance = self.fdai_balances.get(&from).unwrap();
 		let new_balance = *balance + amount;
@@ -163,23 +214,39 @@ impl Markets {
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
 	}
 
-	pub fn get_open_orders(&self, market_id: u64, outcome: u64) -> &HashMap<u128, Order> {
+	pub fn get_open_orders(
+		&self, 
+		market_id: u64, 
+		outcome: u64
+	) -> &HashMap<u128, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 		return &orderbook.open_orders;
 	}
 
-	pub fn get_filled_orders(&self, market_id: u64, outcome: u64) -> &HashMap<u128, Order> {
+	pub fn get_filled_orders(
+		&self, 
+		market_id: u64, 
+		outcome: u64
+	) -> &HashMap<u128, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 		return &orderbook.filled_orders;
 	}
 
-	pub fn get_claimable(&self, market_id: u64, from: String) -> u128 {
+	pub fn get_claimable(
+		&self, 
+		market_id: u64, 
+		from: String
+	) -> u128 {
 		return self.active_markets.get(&market_id).unwrap().get_claimable(from);
 	}
 
-	pub fn claim_earnings(&mut self, market_id: u64, account_id: String) {
+	pub fn claim_earnings(
+		&mut self, 
+		market_id: u64, 
+		account_id: String
+	) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert!(env::block_timestamp() >= market.end_time, "market hasn't ended yet");
 		assert_eq!(market.resoluted, true);
@@ -192,11 +259,16 @@ impl Markets {
 		self.add_balance(claimable);
 	}
 
-	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> {
+	pub fn get_all_markets(
+		&self
+	) -> &BTreeMap<u64, Market> {
 		return &self.active_markets;
 	}
 
-	pub fn get_markets_by_id(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> {
+	pub fn get_markets_by_id(
+		&self, 
+		market_ids: Vec<u64>
+	) -> BTreeMap<u64, &Market> {
 		let mut markets = BTreeMap::new();
 		for market_id in market_ids {
 			markets.insert(market_id, self.active_markets.get(&market_id).unwrap());
@@ -204,7 +276,10 @@ impl Markets {
 		return markets;
 	}
 
-	pub fn get_specific_markets(&self, market_ids: Vec<u64>) -> BTreeMap<u64, &Market> {
+	pub fn get_specific_markets(
+		&self, 
+		market_ids: Vec<u64>
+	) -> BTreeMap<u64, &Market> {
 		let mut markets = BTreeMap::new();
 		for market_id in 0..market_ids.len() {
 			markets.insert(market_id as u64, self.active_markets.get(&(market_id as u64)).unwrap());
@@ -212,38 +287,63 @@ impl Markets {
 		return markets;
 	}
 
-	pub fn get_depth(&self, market_id: u64, outcome: u64, spend: u128, price: u128) -> u128 {
+	pub fn get_depth(
+		&self, 
+		market_id: u64, 
+		outcome: u64, 
+		spend: u128, 
+		price: u128
+	) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
 		return market.get_liquidity_available(outcome, spend, price);
 	}
 
-	pub fn get_liquidity(&self, market_id: u64, outcome: u64, price: u128) -> u128 {
+	pub fn get_liquidity(
+		&self, 
+		market_id: u64, 
+		outcome: u64, 
+		price: u128
+	) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
 		let orderbook = market.orderbooks.get(&outcome).unwrap();
 
 		return orderbook.get_liquidity_at_price(price);
 	}
 
-	pub fn get_market(&self, id: u64) -> &Market {
+	pub fn get_market(
+		&self, 
+		id: u64
+	) -> &Market {
 		let market = self.active_markets.get(&id);
 		return market.unwrap();
 	}
 
-	pub fn get_owner(&self) -> String {
+	pub fn get_owner(
+		&self
+	) -> String {
 		return self.creator.to_string();
 	}
 
-	pub fn get_market_price(&self, market_id: u64, outcome: u64) -> u128 {
+	pub fn get_market_price(
+		&self, 
+		market_id: u64, 
+		outcome: u64
+	) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
 		return market.get_market_price(outcome);
 	}
 
-	pub fn get_best_prices(&self, market_id: u64) -> BTreeMap<u64, u128> {
+	pub fn get_best_prices(
+		&self, 
+		market_id: u64
+	) -> BTreeMap<u64, u128> {
 		let market = self.active_markets.get(&market_id).unwrap();
 		return market.get_market_prices();
 	}
 
-	pub fn get_fdai_metrics(&self) -> (u128, u128, u128, u64) {
+	pub fn get_fdai_metrics(
+		&self
+	) -> (u128, u128, u128, u64) {
 		return (self.fdai_circulation, self.fdai_in_protocol, self.fdai_outside_escrow, self.user_count);
 	}
 
@@ -293,7 +393,9 @@ mod tests {
 		return vec![];
 	}
 
-	fn outcome_tags(number_of_outcomes: u64) -> Vec<String> {
+	fn outcome_tags(
+		number_of_outcomes: u64
+	) -> Vec<String> {
 		let mut outcomes: Vec<String> = vec![];
 		for _ in 0..number_of_outcomes {
 			outcomes.push(empty_string());
@@ -312,7 +414,10 @@ mod tests {
 		return 12379000000;
 	}
 
-	fn get_context(predecessor_account_id: String, block_timestamp: u64) -> VMContext {
+	fn get_context(
+		predecessor_account_id: String, 
+		block_timestamp: u64
+	) -> VMContext {
 		VMContext {
 			current_account_id: alice(),
             signer_account_id: bob(),

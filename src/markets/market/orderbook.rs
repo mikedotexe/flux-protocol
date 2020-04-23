@@ -24,7 +24,9 @@ pub struct Orderbook {
 	pub outcome_id: u64
 }
 impl Orderbook {
-	pub fn new(outcome: u64) -> Self {
+	pub fn new(
+		outcome: u64
+	) -> Self {
 		Self {
 			root: None,
 			open_orders: HashMap::new(),
@@ -41,14 +43,25 @@ impl Orderbook {
 	}
 
     // Grabs latest nonce
-	fn new_order_id(&mut self) -> u128 {
+	fn new_order_id(
+		&mut self
+	) -> u128 {
 		let id = self.nonce;
 		self.nonce = self.nonce + 1;
 		return id;
 	}
 
     // Places order in orderbook
-	pub fn place_order(&mut self, from: String, outcome: u64, spend: u128, amt_of_shares: u128, price: u128, filled: u128, shares_filled: u128) {
+	pub fn place_order(
+		&mut self, 
+		from: String, 
+		outcome: u64, 
+		spend: u128, 
+		amt_of_shares: u128, 
+		price: u128, 
+		filled: u128, 
+		shares_filled: u128
+	) {
 		let order_id = self.new_order_id();
 		let new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price, filled, shares_filled);
 		*self.spend_by_user.entry(from.to_string()).or_insert(0) += spend;
@@ -76,7 +89,10 @@ impl Orderbook {
 	}
 
     // Updates current market order price
-	fn set_best_price(&mut self, price: u128) {
+	fn set_best_price(
+		&mut self, 
+		price: u128
+	) {
 		let current_best_price = self.best_price;
 		if current_best_price.is_none() {
 			self.best_price = Some(price);
@@ -90,7 +106,10 @@ impl Orderbook {
 	}
 
     // Remove order from orderbook -- added price - if invalid order id passed behaviour undefined
-	pub fn remove_order(&mut self, order_id: u128) -> u128 {
+	pub fn remove_order(
+		&mut self, 
+		order_id: u128
+	) -> u128 {
 		// Store copy of order to remove
 		let order = self.open_orders.get_mut(&order_id).unwrap().clone();
 
@@ -130,7 +149,10 @@ impl Orderbook {
 	}
 
 	// TODO: Should catch these rounding errors earlier, right now some "dust" will be lost.
-	pub fn fill_best_orders(&mut self, mut amt_of_shares_to_fill: u128) {
+	pub fn fill_best_orders(
+		&mut self, 
+		mut amt_of_shares_to_fill: u128
+	) {
 	    let mut to_remove : Vec<(u128, u128)> = vec![];
 
 		if let Some(( _ , current_order_map)) = self.orders_by_price.iter_mut().next() {
@@ -163,7 +185,10 @@ impl Orderbook {
 		}
 	}
 
-	pub fn calc_claimable_amt(&self, from: String) -> u128 {
+	pub fn calc_claimable_amt(
+		&self, 
+		from: String
+	) -> u128 {
 		let mut claimable = 0;
 		let empty_vec: Vec<u128> = vec![];
 		let orders_by_user_vec = self.orders_by_user.get(&from).unwrap_or(&empty_vec);
@@ -185,15 +210,20 @@ impl Orderbook {
 		return claimable;
 	}
 
-	// TODO: shouldn't be deleted but maybe flagged claimed - this way we can retain an order history
-	pub fn delete_orders_for(&mut self, from: String) {
+	pub fn delete_orders_for(
+		&mut self, 
+		from: String
+	) {
 		let empty_vec = &mut vec![];
 		let orders_by_user_copy = self.orders_by_user.get(&from).unwrap_or(empty_vec).clone();
 		self.claimed_orders_by_user.insert(from.to_string(), orders_by_user_copy);
         *self.orders_by_user.get_mut(&from).unwrap_or(empty_vec) = vec![];
 	}
 
-    fn remove_filled_order(&mut self, order_id : u128) {
+    fn remove_filled_order(
+		&mut self, 
+		order_id : u128
+	) {
         // Get filled orders at price
         let order = self.filled_orders.get(&order_id).unwrap();
         // Remove order from user map
@@ -205,11 +235,16 @@ impl Orderbook {
         self.filled_orders.remove(&order_id);
     }
 
-	pub fn get_best_price(&self) -> u128 {
+	pub fn get_best_price(
+		&self
+	) -> u128 {
 		return self.best_price.unwrap();
 	}
 
-	pub fn get_open_order_value_for(&self, from: String) -> u128 {
+	pub fn get_open_order_value_for(
+		&self, 
+		from: String
+	) -> u128 {
 		let mut claimable = 0;
 		let empty_vec: Vec<u128> = vec![];
 		let orders_by_user_vec = self.orders_by_user.get(&from).unwrap_or(&empty_vec);
@@ -226,11 +261,17 @@ impl Orderbook {
 		return claimable;
 	}
 
-	pub fn get_spend_by(&self, from: String) -> u128 {
+	pub fn get_spend_by(
+		&self, 
+		from: String
+	) -> u128 {
 		return *self.spend_by_user.get(&from).unwrap_or(&0);
 	}
 
-	pub fn get_liquidity_at_price(&self, price: u128) -> u128 {
+	pub fn get_liquidity_at_price(
+		&self, 
+		price: u128
+	) -> u128 {
 		let spend_liquidity = *self.liquidity_by_price.get(&price).unwrap_or(&0);
 		if spend_liquidity == 0 {
 			return 0

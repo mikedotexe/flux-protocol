@@ -18,7 +18,16 @@ pub struct Order {
 }
 
 impl Order {
-	pub fn new(creator: String, outcome: u64, id: u128, spend:u128, amt_of_shares: u128, price: u128, filled: u128, shares_filled: u128) -> Self {
+	pub fn new(
+		creator: String, 
+		outcome: u64, 
+		id: u128, 
+		spend:u128, 
+		amt_of_shares: u128, 
+		price: u128, 
+		filled: u128, 
+		shares_filled: u128
+	) -> Self {
 		let creation_time = env::block_timestamp() / 1000000;
 
 		Order {
