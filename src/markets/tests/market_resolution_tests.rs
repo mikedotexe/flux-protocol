@@ -54,11 +54,7 @@ fn test_valid_market_payout_calc() {
 	testing_env!(get_context(carol(), current_block_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-<<<<<<< HEAD
-	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), market_creation_timestamp());
-=======
 	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), market_end_timestamp(), 0, 0, "test".to_string());
->>>>>>> ce15ee57b6511b1f80e7545cc9b7cf1cf5e6e0f5
 
 	contract.place_order(0, 0, 7000, 70);
 
