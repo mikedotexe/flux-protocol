@@ -1,15 +1,20 @@
 use std::string::String;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use near_sdk::{near_bindgen, env};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
+pub struct Dispute {
+	pub round: u64,
+	pub round_end: u128,
+	pub bond_size: u128
+}
 
 pub mod orderbook;
 type Orderbook = orderbook::Orderbook;
 type Order = orderbook::Order;
 
-#[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Market {
 	pub id: u64,
@@ -28,7 +33,7 @@ pub struct Market {
 	pub resolute_bond: u128,
 	pub liquidity: u128,
 	pub disputed: bool,
-	pub dispute_round: u64,
+	pub dispute: Option<Dispute>,
 	pub finalized: bool,
 	pub fee_percentage: u128,
 	pub cost_percentage: u128,
@@ -36,6 +41,7 @@ pub struct Market {
 	pub resolvers: BTreeMap<u64, Vec<(String, Option<u64>, u128)>>, // round to (resolver id, outcome, stake)
 }
 
+#[near_bindgen]
 impl Market {
 	pub fn new(
 		id: u64, 
@@ -73,12 +79,12 @@ impl Market {
 			resolute_bond: 5,
 			liquidity: 0,
 			disputed: false,
+			dispute: None,
 			finalized: false,
 			fee_percentage,
 			cost_percentage,
 			api_source,
-			resolvers: BTreeMap::new(),
-			dispute_round: 0,
+			resolvers: BTreeMap::new()
 		}
 	}
 
@@ -220,7 +226,11 @@ impl Market {
         let bond = self.resolute_bond;
         let resolution = self.resolvers.entry(0).or_insert(Vec::new());
         resolution.push((from, winning_outcome, bond));
-        self.dispute_round = 0;
+        self.dispute = Some(Dispute {
+			round: 0,
+			bond_size: bond,
+			round_end: (env::block_timestamp() + 1800) as u128 // should be 30 minutes
+		});
 	}
 
 	pub fn dispute(
@@ -229,7 +239,7 @@ impl Market {
 		winning_outcome: Option<u64>, 
 		bond: u128
 	) -> u128{
-	    assert_eq!(self.resoluted, true);
+		assert_eq!(self.resoluted, true);
 	    assert_eq!(self.disputed, false);
 	    assert_eq!(self.finalized, false);
         assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome);

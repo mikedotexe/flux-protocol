@@ -29,7 +29,7 @@ impl Markets {
 		&self
 	) -> u128 {
 		let base: u128 = 10;
-		return base.pow(17);
+		return base.pow(17)
 	}
 
 	// This is a demo method, it mints a currency to interact with markets until we have NDAI
@@ -183,7 +183,7 @@ impl Markets {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, true);
 		if market.disputed {
-			assert_eq!(env::predecessor_account_id(), self.owner);
+			assert_eq!(env::predecessor_account_id(), self.creator);
 		}
         market.finalize(env::predecessor_account_id(), winning_outcome);
 	}
