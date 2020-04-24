@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 mod market;
 type Market = market::Market;
 type Order = market::orderbook::order::Order;
+			// TODO: Apearantly child contracts can read the predecessor account as well so we don't need to pass it as "from"
 
 #[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
@@ -164,15 +165,12 @@ impl Markets {
 		&mut self, 
 		market_id: u64, 
 		winning_outcome: Option<u64>, 
-		bond: u128
 	) {
 	    let from = env::predecessor_account_id();
         let market = self.active_markets.get_mut(&market_id).unwrap();
-        assert_eq!(market.resoluted, true);
-        assert_eq!(market.disputed, false);
-
-        let return_amount = market.dispute(from, winning_outcome, bond);
-        self.subtract_balance(bond-return_amount);
+		let bond_size = market.resolute_bond; // Should be resolution_bond * 2 for next versions
+		market.dispute(from, winning_outcome, bond_size);
+        self.subtract_balance(bond_size);
 	}
 
 	pub fn finalize_market(
@@ -200,6 +198,7 @@ impl Markets {
 	) {
 		let from = env::predecessor_account_id();
 		let balance = self.fdai_balances.get(&from).unwrap();
+		assert!(*balance >= amount, "sender has unsufficient balance");
 		let new_balance = *balance - amount;
 		self.fdai_balances.insert(from, new_balance);
 
@@ -381,6 +380,10 @@ mod tests {
     use near_sdk::MockedBlockchain;
     use near_sdk::{VMContext, VMConfig, testing_env};
 
+	fn owner() -> String {
+		return "flux-dev".to_string();
+	}
+
 	fn alice() -> String {
 		return "alice.near".to_string();
 	}
@@ -446,12 +449,12 @@ mod tests {
 		}
 	}
 
-	mod init_tests;
-	mod market_order_tests;
-	mod binary_order_matching_tests;
-	mod categorical_market_tests;
-	mod market_resolution_tests;
-	mod claim_earnings_tests;
-	mod market_depth_tests;
+	// mod init_tests;
+	// mod market_order_tests;
+	// mod binary_order_matching_tests;
+	// mod categorical_market_tests;
+	// mod market_resolution_tests;
+	// mod claim_earnings_tests;
+	// mod market_depth_tests;
 	mod market_dispute_tests;
 }

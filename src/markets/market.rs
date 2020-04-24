@@ -236,37 +236,39 @@ impl Market {
 	pub fn dispute(
 		&mut self, 
 		from: String, 
-		winning_outcome: Option<u64>, 
-		bond: u128
-	) -> u128{
+		winning_outcome: Option<u64>,
+		bond_size: u128
+	){
 		assert_eq!(self.resoluted, true, "market isn't resoluted yet");
-		assert_eq!(self.finalized, false, "maret is already finalized");
+		assert_eq!(self.finalized, false, "market is already finalized");
         assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome, "invalid or already set winning outcome");
+		
 		let dispute_window = self.dispute_window.as_ref().unwrap();
 		assert_eq!(dispute_window.round, 0, "for this version, there's only 1 round of dispute. The market is then finalized by the protocol owner");
-		assert!(env::block_timestamp() <= dispute_window.end_time, "dispute window has already passed");
+		assert!(env::block_timestamp() <= dispute_window.end_time, "dispute window has already ended, market can be finalized");
+		// TODO: Should be asserted not conditinally checked
+		self.disputed = true;
+		let round_resolvers = self.resolvers.entry(1).or_insert(Vec::new());
+		round_resolvers.push((from, winning_outcome, self.resolute_bond));
 
-		// Check that dispute window isn't closed
-        let mut return_amount = 0;
-        if bond >= self.resolute_bond {
-            return_amount = bond - self.resolute_bond;
-            self.disputed = true;
-            let round_resolvers = self.resolvers.entry(1).or_insert(Vec::new());
-            round_resolvers.push((from, winning_outcome, self.resolute_bond));
-        }
-        return return_amount;
+		self.dispute_window = Some(DisputeWindow {
+			round: 0,
+			bond_size: bond_size,
+			end_time: (env::block_timestamp() + 1800) // should be 30 minutes, is 30 nano minutes now?
+		});
 	}
 
 	pub fn finalize(
 		&mut self, 
 		winning_outcome: Option<u64>
 	) {
-		assert_eq!(self.resoluted, true);
-		
-		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
+		assert_eq!(self.resoluted, true, "market isn't resoluted yet");
+		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes, "invalid outcome");
+	
 	    if self.disputed {
             self.winning_outcome = winning_outcome;
-	    }
+		}
+		
 	    self.finalized = true;
 	}
 
