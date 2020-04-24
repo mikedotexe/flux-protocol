@@ -62,6 +62,8 @@ impl Market {
 			empty_orderbooks.insert(i, Orderbook::new(i));
 		}
 
+		let base: u128 = 10;
+
 		Self {
 			id,
 			description,
@@ -76,7 +78,7 @@ impl Market {
 			orderbooks: empty_orderbooks,
 			winning_outcome: None,
 			resoluted: false,
-			resolute_bond: 5,
+			resolute_bond: 5 * base.pow(17),
 			liquidity: 0,
 			disputed: false,
 			dispute_window: None,
@@ -238,7 +240,7 @@ impl Market {
 		from: String, 
 		winning_outcome: Option<u64>,
 		bond_size: u128
-	){
+	) {
 		assert_eq!(self.resoluted, true, "market isn't resoluted yet");
 		assert_eq!(self.finalized, false, "market is already finalized");
         assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome, "invalid or already set winning outcome");
@@ -246,13 +248,14 @@ impl Market {
 		let dispute_window = self.dispute_window.as_ref().unwrap();
 		assert_eq!(dispute_window.round, 0, "for this version, there's only 1 round of dispute. The market is then finalized by the protocol owner");
 		assert!(env::block_timestamp() <= dispute_window.end_time, "dispute window has already ended, market can be finalized");
-		// TODO: Should be asserted not conditinally checked
+
+		let next_round = dispute_window.round + 1;
 		self.disputed = true;
-		let round_resolvers = self.resolvers.entry(1).or_insert(Vec::new());
+		let round_resolvers = self.resolvers.entry(next_round).or_insert(Vec::new());
 		round_resolvers.push((from, winning_outcome, self.resolute_bond));
 
 		self.dispute_window = Some(DisputeWindow {
-			round: 0,
+			round: next_round,
 			bond_size: bond_size,
 			end_time: (env::block_timestamp() + 1800) // should be 30 minutes, is 30 nano minutes now?
 		});
@@ -311,7 +314,7 @@ impl Market {
         let mut resolute_claimable = 0;
         let mut user_correctly_staked = 0;
         let mut total_correctly_staked = 0;
-        for (round, round_vec) in self.resolvers.iter() {
+        for (_, round_vec) in self.resolvers.iter() {
             for dispute in round_vec.iter() {
                 if dispute.0 == from && dispute.1 == self.winning_outcome {
                     user_correctly_staked += dispute.2;

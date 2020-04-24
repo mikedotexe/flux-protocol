@@ -380,7 +380,7 @@ mod tests {
     use near_sdk::MockedBlockchain;
     use near_sdk::{VMContext, VMConfig, testing_env};
 
-	fn owner() -> String {
+	fn judge() -> String {
 		return "flux-dev".to_string();
 	}
 
