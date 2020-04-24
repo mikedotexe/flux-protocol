@@ -182,10 +182,16 @@ impl Markets {
 	) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, true);
+		
 		if market.disputed {
 			assert_eq!(env::predecessor_account_id(), self.creator);
+		} else {
+			// Check that the first dispute window is closed
+			let dispute_window = market.dispute_window.as_ref().unwrap();
+			assert!(env::block_timestamp() >= dispute_window.end_time)
 		}
-        market.finalize(env::predecessor_account_id(), winning_outcome);
+
+        market.finalize(winning_outcome);
 	}
 
 	fn subtract_balance(

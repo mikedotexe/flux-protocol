@@ -5,9 +5,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
-pub struct Dispute {
+pub struct DisputeWindow {
 	pub round: u64,
-	pub round_end: u128,
+	pub end_time: u64,
 	pub bond_size: u128
 }
 
@@ -33,7 +33,7 @@ pub struct Market {
 	pub resolute_bond: u128,
 	pub liquidity: u128,
 	pub disputed: bool,
-	pub dispute: Option<Dispute>,
+	pub dispute_window: Option<DisputeWindow>,
 	pub finalized: bool,
 	pub fee_percentage: u128,
 	pub cost_percentage: u128,
@@ -79,7 +79,7 @@ impl Market {
 			resolute_bond: 5,
 			liquidity: 0,
 			disputed: false,
-			dispute: None,
+			dispute_window: None,
 			finalized: false,
 			fee_percentage,
 			cost_percentage,
@@ -226,10 +226,10 @@ impl Market {
         let bond = self.resolute_bond;
         let resolution = self.resolvers.entry(0).or_insert(Vec::new());
         resolution.push((from, winning_outcome, bond));
-        self.dispute = Some(Dispute {
+        self.dispute_window = Some(DisputeWindow {
 			round: 0,
 			bond_size: bond,
-			round_end: (env::block_timestamp() + 1800) as u128 // should be 30 minutes
+			end_time: (env::block_timestamp() + 1800) // should be 30 minutes is like 30 nano minutes now?
 		});
 	}
 
@@ -239,11 +239,14 @@ impl Market {
 		winning_outcome: Option<u64>, 
 		bond: u128
 	) -> u128{
-		assert_eq!(self.resoluted, true);
-	    assert_eq!(self.disputed, false);
-	    assert_eq!(self.finalized, false);
-        assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome);
+		assert_eq!(self.resoluted, true, "market isn't resoluted yet");
+		assert_eq!(self.finalized, false, "maret is already finalized");
+        assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome, "invalid or already set winning outcome");
+		let dispute_window = self.dispute_window.as_ref().unwrap();
+		assert_eq!(dispute_window.round, 0, "for this version, there's only 1 round of dispute. The market is then finalized by the protocol owner");
+		assert!(env::block_timestamp() <= dispute_window.end_time, "dispute window has already passed");
 
+		// Check that dispute window isn't closed
         let mut return_amount = 0;
         if bond >= self.resolute_bond {
             return_amount = bond - self.resolute_bond;
@@ -256,10 +259,10 @@ impl Market {
 
 	pub fn finalize(
 		&mut self, 
-		from: String,  
 		winning_outcome: Option<u64>
 	) {
-	    assert_eq!(self.resoluted, true);
+		assert_eq!(self.resoluted, true);
+		
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
 	    if self.disputed {
             self.winning_outcome = winning_outcome;

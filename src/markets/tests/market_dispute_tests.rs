@@ -19,8 +19,6 @@ fn test_dispute_valid() {
     contract.resolute(0, Some(0));
     testing_env!(get_context(alice(), market_end_timestamp()));
 	contract.dispute(0, Some(1), 10);
-	
-	// The final outcome passed in by the "judge" should probably done by as another dispute
     testing_env!(get_context(carol(), market_end_timestamp()));
     contract.finalize_market(0, Some(0));
 
