@@ -380,6 +380,11 @@ mod tests {
     use near_sdk::MockedBlockchain;
     use near_sdk::{VMContext, VMConfig, testing_env};
 
+	fn to_dai(amt: u128) -> u128 {
+		let base = 10 as u128;
+		return amt * base.pow(17);
+	}
+
 	fn judge() -> String {
 		return "flux-dev".to_string();
 	}
