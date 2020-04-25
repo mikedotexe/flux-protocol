@@ -10,6 +10,11 @@ pub struct DisputeWindow {
 	pub end_time: u64,
 	pub bond_size: u128
 }
+#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
+pub struct ResolutionParitcipation {
+	pub account: String,
+	pub stake: u128
+}
 
 pub mod orderbook;
 type Orderbook = orderbook::Orderbook;
@@ -38,6 +43,7 @@ pub struct Market {
 	pub fee_percentage: u128,
 	pub cost_percentage: u128,
 	pub api_source: String,
+	pub resoltion_rounds : BTreeMap<u64, HashMap<u64, u128>>, // round -> outcome -> ResolutionParticipation {account, stake} 
 	pub resolvers: BTreeMap<u64, Vec<(String, Option<u64>, u128)>>, // round to (resolver id, outcome, stake)
 }
 
@@ -225,15 +231,28 @@ impl Market {
         self.resoluted = true;
 
         // Insert (outcome, round, stake)
-        let bond = self.resolute_bond;
         let resolution = self.resolvers.entry(0).or_insert(Vec::new());
-        resolution.push((from, winning_outcome, bond));
+		resolution.push((from, winning_outcome, bond));
+		
+		// check if resolution_bond total is sufficient, if so start dispute window
+
         self.dispute_window = Some(DisputeWindow {
 			round: 0,
-			bond_size: bond,
+			bond_size: self.resolute_bond, // + self.resolute_bond * round
 			end_time: (env::block_timestamp() + 1800) // should be 30 minutes is like 30 nano minutes now?
 		});
 	}
+
+	fn start_new_dispute_round(&mut self) {
+		let last_round = self.dispute_window.unwrap().round;
+
+		self.dispute_window = Some(DisputeWindow {
+			round: 0,
+			bond_size: self.resolute_bond, // + self.resolute_bond * round
+			end_time: (env::block_timestamp() + 1800) // should be 30 minutes is like 30 nano minutes now?
+		});
+	}
+
 
 	pub fn dispute(
 		&mut self, 
