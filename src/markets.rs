@@ -144,7 +144,7 @@ impl Markets {
 		orderbook.remove_order(order_id);
     }
 
-	pub fn resolute(
+	pub fn resolute_market(
 		&mut self, 
 		market_id: u64, 
 		winning_outcome: Option<u64>
@@ -161,10 +161,11 @@ impl Markets {
 		self.subtract_balance(bond);
 	}
 
-	pub fn dispute(
+	// TODO: Wes' implementation had some ability to put up part of the dispute bond, need to reimplement this
+	pub fn dispute_market(
 		&mut self, 
 		market_id: u64, 
-		winning_outcome: Option<u64>, 
+		winning_outcome: Option<u64>
 	) {
 	    let from = env::predecessor_account_id();
         let market = self.active_markets.get_mut(&market_id).unwrap();
@@ -378,7 +379,7 @@ impl Default for Markets {
 mod tests {
     use super::*;
     use near_sdk::MockedBlockchain;
-    use near_sdk::{VMContext, VMConfig, testing_env};
+    use near_sdk::{VMContext, testing_env};
 
 	fn to_dai(amt: u128) -> u128 {
 		let base = 10 as u128;
