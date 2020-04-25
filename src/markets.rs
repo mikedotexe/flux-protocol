@@ -66,7 +66,7 @@ impl Markets {
 	}
 
 	pub fn get_fdai_balance(&self, from: String) -> u128 {
-		return *self.fdai_balances.get(&from).unwrap();
+		return *self.fdai_balances.get(&from).unwrap_or(&0);
 	}
 
 	pub fn create_market(
@@ -183,11 +183,11 @@ impl Markets {
 		assert_eq!(market.resoluted, true);
 		
 		if market.disputed {
-			assert_eq!(env::predecessor_account_id(), self.creator);
+			assert_eq!(env::predecessor_account_id(), self.creator, "only the owner can resolute disputed markets");
 		} else {
 			// Check that the first dispute window is closed
 			let dispute_window = market.dispute_window.as_ref().unwrap();
-			assert!(env::block_timestamp() >= dispute_window.end_time)
+			assert!(env::block_timestamp() >= dispute_window.end_time, "dispute window still open")
 		}
 
         market.finalize(winning_outcome);

@@ -213,7 +213,7 @@ impl Market {
 		&mut self, 
 		from: String, 
 		winning_outcome: Option<u64>, 
-		bond: u128
+		bond: u128 // should reimplement this
 	) {
 		// TODO: Make sure market can only be resoluted after end time
 		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
@@ -243,17 +243,18 @@ impl Market {
 	) {
 		assert_eq!(self.resoluted, true, "market isn't resoluted yet");
 		assert_eq!(self.finalized, false, "market is already finalized");
-        assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome, "invalid or already set winning outcome");
+		println!("winning outcome: {:?}  dispute outcome{:?}", self.winning_outcome, winning_outcome);
+        assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome, "invalid winning outcome");
 		
 		let dispute_window = self.dispute_window.as_ref().unwrap();
 		assert_eq!(dispute_window.round, 0, "for this version, there's only 1 round of dispute. The market is then finalized by the protocol owner");
-		assert!(env::block_timestamp() <= dispute_window.end_time, "dispute window has already ended, market can be finalized");
+		assert!(env::block_timestamp() <= dispute_window.end_time, "dispute window is closed, market can be finalized");
 
 		let next_round = dispute_window.round + 1;
 		self.disputed = true;
+		self.winning_outcome = winning_outcome;
 		let round_resolvers = self.resolvers.entry(next_round).or_insert(Vec::new());
 		round_resolvers.push((from, winning_outcome, self.resolute_bond));
-
 		self.dispute_window = Some(DisputeWindow {
 			round: next_round,
 			bond_size: bond_size,
