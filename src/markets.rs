@@ -147,31 +147,36 @@ impl Markets {
 	pub fn resolute_market(
 		&mut self, 
 		market_id: u64, 
-		winning_outcome: Option<u64>
+		winning_outcome: Option<u64>,
+		stake: u128
 	) {
+		// TODO: Calc refund here and take into account before callign child method, this way there's no case in whicih
+		// stake is bigger than bond in child method
 		let from = env::predecessor_account_id();
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, false);
 
-		let bond = market.resolute_bond;
 		let balance = self.fdai_balances.get(&from).unwrap();
-        assert!(balance >= &bond);
+        assert!(balance >= &stake);
 
-		market.resolute(from, winning_outcome, bond);
-		self.subtract_balance(bond);
+		market.resolute(winning_outcome, stake);
+		self.subtract_balance(stake);
 	}
 
-	// TODO: Wes' implementation had some ability to put up part of the dispute bond, need to reimplement this
 	pub fn dispute_market(
 		&mut self, 
 		market_id: u64, 
-		winning_outcome: Option<u64>
+		winning_outcome: Option<u64>,
+		stake: u128
 	) {
+		// TODO: Calc refund here and take into account before callign child method, this way there's no case in whicih
+		// stake is bigger than bond in child method
 	    let from = env::predecessor_account_id();
         let market = self.active_markets.get_mut(&market_id).unwrap();
-		let bond_size = market.resolute_bond; // Should be resolution_bond * 2 for next versions
-		market.dispute(from, winning_outcome, bond_size);
-        self.subtract_balance(bond_size);
+		let balance = self.fdai_balances.get(&from).unwrap();
+		assert!(balance >= &stake);		
+		market.dispute(winning_outcome, stake);
+        self.subtract_balance(stake);
 	}
 
 	pub fn finalize_market(
@@ -186,8 +191,9 @@ impl Markets {
 			assert_eq!(env::predecessor_account_id(), self.creator, "only the owner can resolute disputed markets");
 		} else {
 			// Check that the first dispute window is closed
-			let dispute_window = market.dispute_window.as_ref().unwrap();
-			assert!(env::block_timestamp() >= dispute_window.end_time, "dispute window still open")
+			println!("{:?}",market.resolution_windows.last());
+			// let dispute_window = market.resolution_windows.as_ref().unwrap();
+			// assert!(env::block_timestamp() >= dispute_window.end_time, "dispute window still open")
 		}
 
         market.finalize(winning_outcome);

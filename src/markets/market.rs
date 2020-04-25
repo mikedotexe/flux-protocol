@@ -5,15 +5,13 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
-pub struct DisputeWindow {
+pub struct ResolutionWindow {
 	pub round: u64,
+	pub participants_to_outcome_to_stake: HashMap<String, HashMap<Option<u64>, u128>>, // Account to outcome to stake
+	pub required_bond_size: u128,
+	pub staked_per_outcome: HashMap<Option<u64>, u128>, // Staked per outcome
 	pub end_time: u64,
-	pub bond_size: u128
-}
-#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
-pub struct ResolutionParitcipation {
-	pub account: String,
-	pub stake: u128
+	// Add round outcome and total staked
 }
 
 pub mod orderbook;
@@ -38,13 +36,11 @@ pub struct Market {
 	pub resolute_bond: u128,
 	pub liquidity: u128,
 	pub disputed: bool,
-	pub dispute_window: Option<DisputeWindow>,
 	pub finalized: bool,
 	pub fee_percentage: u128,
 	pub cost_percentage: u128,
 	pub api_source: String,
-	pub resoltion_rounds : BTreeMap<u64, HashMap<u64, u128>>, // round -> outcome -> ResolutionParticipation {account, stake} 
-	pub resolvers: BTreeMap<u64, Vec<(String, Option<u64>, u128)>>, // round to (resolver id, outcome, stake)
+	pub resolution_windows: Vec<ResolutionWindow>
 }
 
 #[near_bindgen]
@@ -69,6 +65,13 @@ impl Market {
 		}
 
 		let base: u128 = 10;
+		let base_resolution_window = ResolutionWindow {
+			round: 0,
+			participants_to_outcome_to_stake: HashMap::new(),
+			required_bond_size: 5 * base.pow(17),
+			staked_per_outcome: HashMap::new(), // Staked per outcome
+			end_time: end_time
+		};
 
 		Self {
 			id,
@@ -87,12 +90,11 @@ impl Market {
 			resolute_bond: 5 * base.pow(17),
 			liquidity: 0,
 			disputed: false,
-			dispute_window: None,
 			finalized: false,
 			fee_percentage,
 			cost_percentage,
 			api_source,
-			resolvers: BTreeMap::new()
+			resolution_windows: vec![base_resolution_window]
 		}
 	}
 
@@ -217,68 +219,72 @@ impl Market {
 
 	pub fn resolute(
 		&mut self, 
-		from: String, 
 		winning_outcome: Option<u64>, 
-		bond: u128 // should reimplement this
+		stake: u128 // should reimplement this
 	) {
 		// TODO: Make sure market can only be resoluted after end time
 		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false);
 		assert_eq!(self.finalized, false);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
+		assert!(self.resolute_bond > 0, "resolution bond already staked");
 
-        self.winning_outcome = winning_outcome;
-        self.resoluted = true;
+		let mut to_return = 0;
+		let resolution_window = self.resolution_windows.last().unwrap();
 
-        // Insert (outcome, round, stake)
-        let resolution = self.resolvers.entry(0).or_insert(Vec::new());
-		resolution.push((from, winning_outcome, bond));
-		
-		// check if resolution_bond total is sufficient, if so start dispute window
+		// different check
+		// Refactor
+		if stake >= self.resolute_bond {
+			self.winning_outcome = winning_outcome;
+			self.resoluted = true;	
+			self.resolute_bond = 0;
+			to_return = stake - self.resolute_bond;
+			// set resolution_window.end_time to market end + 30 min
 
-        self.dispute_window = Some(DisputeWindow {
-			round: 0,
-			bond_size: self.resolute_bond, // + self.resolute_bond * round
-			end_time: (env::block_timestamp() + 1800) // should be 30 minutes is like 30 nano minutes now?
-		});
+		} else {
+			// self.resolute_bond -= bond;
+		}
+
+		// TODO: Stake should be changed to stake - to_return
+		// Set participants and total stake
+		resolution_window.participants_to_outcome_to_stake
+		.entry(env::predecessor_account_id())
+		.or_insert(HashMap::new())
+		.entry(winning_outcome)
+		.and_modify(|staked| {*staked += stake})
+		.or_insert(stake);
+
+		resolution_window.staked_per_outcome
+		.entry(winning_outcome)
+		.and_modify(|total_staked| {*total_staked += stake});
 	}
-
-	fn start_new_dispute_round(&mut self) {
-		let last_round = self.dispute_window.unwrap().round;
-
-		self.dispute_window = Some(DisputeWindow {
-			round: 0,
-			bond_size: self.resolute_bond, // + self.resolute_bond * round
-			end_time: (env::block_timestamp() + 1800) // should be 30 minutes is like 30 nano minutes now?
-		});
-	}
-
 
 	pub fn dispute(
 		&mut self, 
-		from: String, 
 		winning_outcome: Option<u64>,
-		bond_size: u128
+		stake: u128
 	) {
 		assert_eq!(self.resoluted, true, "market isn't resoluted yet");
 		assert_eq!(self.finalized, false, "market is already finalized");
-		println!("winning outcome: {:?}  dispute outcome{:?}", self.winning_outcome, winning_outcome);
         assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome, "invalid winning outcome");
 		
-		let dispute_window = self.dispute_window.as_ref().unwrap();
-		assert_eq!(dispute_window.round, 0, "for this version, there's only 1 round of dispute. The market is then finalized by the protocol owner");
+		let dispute_window = self.resolution_windows.last().unwrap();
+		assert_eq!(dispute_window.round, 1, "for this version, there's only 1 round of dispute. The market is then finalized by the protocol owner");
 		assert!(env::block_timestamp() <= dispute_window.end_time, "dispute window is closed, market can be finalized");
 
-		let next_round = dispute_window.round + 1;
-		self.disputed = true;
-		self.winning_outcome = winning_outcome;
-		let round_resolvers = self.resolvers.entry(next_round).or_insert(Vec::new());
-		round_resolvers.push((from, winning_outcome, self.resolute_bond));
-		self.dispute_window = Some(DisputeWindow {
-			round: next_round,
-			bond_size: bond_size,
-			end_time: (env::block_timestamp() + 1800) // should be 30 minutes, is 30 nano minutes now?
-		});
+		dispute_window.participants_to_outcome_to_stake
+		.entry(env::predecessor_account_id())
+		.or_insert(HashMap::new())
+		.entry(winning_outcome)
+		.and_modify(|staked| { *staked += stake })
+		.or_insert(stake);
+		
+		// If dispute bond is posted, create next dispute round
+		// only for next dispute round
+		// let next_round = dispute_window.round + 1;
+		// self.disputed = true;
+		// self.winning_outcome = winning_outcome;
+		
 	}
 
 	pub fn finalize(
@@ -327,13 +333,36 @@ impl Market {
 		return claimable;
 	}
 
+	// TODO: Think about what to do with all value locked up in previous dispute rounds where the bond didn't get completely filled
+	// option 1: refund
+	// option 2: devide among succesful staker
+	// My thinking: it should be refunded, I think that the bond is only posted when all stake for it is accumilated and until then all 
+	// "stake" is withdrawable. 
+	// This mostly has to do with fairness on fund distribution since non-"bonded" stake didn't end up ina  bond for that outcome 
+	// and should be able to be used during the next dispute window
+
 	fn get_dispute_earnings(
 		&self, 
 		from: String
 	) -> u128 {
-        let mut resolute_claimable = 0;
         let mut user_correctly_staked = 0;
-        let mut total_correctly_staked = 0;
+		let mut total_correctly_staked = 0;
+		
+		// need total staked per window
+		for window in self.resolution_windows {
+			let round_participation = window.participants_to_outcome_to_stake
+			.get(&from)
+			.unwrap_or(&HashMap::new())
+			.get(&self.winning_outcome)
+			.unwrap_or(&0);
+			let correct_stake = window.staked_per_outcome
+			.get(&self.winning_outcome)
+			.unwrap_or(&0);
+
+			user_correctly_staked += *round_participation;
+			total_correctly_staked += correct_stake;
+		}		
+
         for (_, round_vec) in self.resolvers.iter() {
             for dispute in round_vec.iter() {
                 if dispute.0 == from && dispute.1 == self.winning_outcome {
