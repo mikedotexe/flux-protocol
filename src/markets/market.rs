@@ -37,6 +37,7 @@ pub struct Market {
 	pub liquidity: u128,
 	pub disputed: bool,
 	pub finalized: bool,
+	pub fee_claimed: bool,
 	pub fee_percentage: u128,
 	pub cost_percentage: u128,
 	pub api_source: String,
@@ -47,7 +48,7 @@ pub struct Market {
 impl Market {
 	pub fn new(
 		id: u64, 
-		from: String, 
+		account_id: String, 
 		description: String, 
 		extra_info: String, 
 		outcomes: u64, 
@@ -78,7 +79,7 @@ impl Market {
 			id,
 			description,
 			extra_info,
-			creator: from,
+			creator: account_id,
 			outcomes,
 			outcome_tags,
 			categories,
@@ -92,6 +93,7 @@ impl Market {
 			liquidity: 0,
 			disputed: false,
 			finalized: false,
+			fee_claimed: false,
 			fee_percentage,
 			cost_percentage,
 			api_source,
@@ -101,7 +103,7 @@ impl Market {
 
 	pub fn place_order(
 		&mut self, 
-		from: String, 
+		account_id: String, 
 		outcome: u64, 
 		amt_of_shares: u128, 
 		spend: u128, 
@@ -116,7 +118,7 @@ impl Market {
 		self.liquidity += shares_filled * price * (100/price);
 		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
-		orderbook.place_order(from, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
+		orderbook.place_order(account_id, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
 	}
 
 	fn fill_matches(
@@ -225,7 +227,8 @@ impl Market {
 		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false, "market is already resoluted");
 		assert_eq!(self.finalized, false, "market is already finalized");
-		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
+		println!("{:?}  {}", winning_outcome, self.outcomes);
+		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes, "invalid winning outcome");
 		let resolution_window = self.resolution_windows.last_mut().expect("no resolute window exists, something went wrong at creation");
 		assert_eq!(resolution_window.round, 0, "can only resolute once");
 		
@@ -257,7 +260,7 @@ impl Market {
 				participants_to_outcome_to_stake: HashMap::new(),
 				required_bond_size: resolution_window.required_bond_size * 2,
 				staked_per_outcome: HashMap::new(), // Staked per outcome
-				end_time: env::block_timestamp() + 36000,
+				end_time: env::block_timestamp() + 1800, // 30 nano minutes should be 30 minutes
 				outcome: None,
 			};
 			self.resolution_windows.push(new_resolution_window);
@@ -351,33 +354,29 @@ impl Market {
 
 	pub fn get_claimable(
 		&self, 
-		from: String
+		account_id: String
 	) -> u128 {
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
-
-        // Claiming fees
-        if from == self.creator {
-            claimable += self.liquidity * (self.fee_percentage)/100;
-        }
-
+		
         // Claiming payouts
 		if invalid {
 			for (_, orderbook) in self.orderbooks.iter() {
-			    let spent = orderbook.get_spend_by(from.to_string());
-				claimable += spent * (100-self.fee_percentage)/100;
+			    let spent = orderbook.get_spend_by(account_id.to_string());
+				claimable += spent; // market creator forfits his fee when market resolutes to invalid
 			}
 		} else {
 			for (_, orderbook) in self.orderbooks.iter() {
-				claimable += orderbook.get_open_order_value_for(from.to_string());
+				claimable += orderbook.get_open_order_value_for(account_id.to_string());
 			}
+			println!("in open orders: {}", claimable);
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
-			let winning_value = winning_orderbook.calc_claimable_amt(from.to_string());
+			let winning_value = winning_orderbook.calc_claimable_amt(account_id.to_string());
 			claimable += winning_value * (100-self.fee_percentage)/100;
-        }
-
+		}
+		
 		// Claiming Dispute Earnings
-        claimable += self.get_dispute_earnings(from.to_string());
+        claimable += self.get_dispute_earnings(account_id.to_string());
 		return claimable;
 	}
 
@@ -403,18 +402,16 @@ impl Market {
 
 	fn get_dispute_earnings(
 		&self, 
-		from: String
+		account_id: String
 	) -> u128 {
         let mut user_correctly_staked = 0;
 		let mut total_correctly_staked = 0;
 		let mut total_incorrectly_staked = 0;
 		// need total staked per window
 		for window in &self.resolution_windows {
-			println!("window {:?}", window );
-
 			let empty_map = HashMap::new();
 			let round_participation = window.participants_to_outcome_to_stake
-			.get(&from)
+			.get(&account_id)
 			.unwrap_or(&empty_map)
 			.get(&self.winning_outcome)
 			.unwrap_or(&0);
@@ -434,7 +431,6 @@ impl Market {
 
 		if total_correctly_staked == 0 {return 0}
 
-		println!("claimable from dispute: {}", user_correctly_staked / total_correctly_staked * total_incorrectly_staked);
         return user_correctly_staked / total_correctly_staked * total_incorrectly_staked;
 	}
 
@@ -546,20 +542,21 @@ impl Market {
 
 	pub fn delete_orders_for(
 		&mut self, 
-		from: String
+		account_id: String
 	) {
 		for orderbook_id in 0..self.outcomes {
 			let orderbook = self.orderbooks.get_mut(&orderbook_id).unwrap();
-			orderbook.delete_orders_for(from.to_string());
+			orderbook.delete_orders_for(account_id.to_string());
 		}
 	}
 
 	pub fn delete_resolution_for(
-		&mut self
+		&mut self,
+		account_id: String,
 	) {
 		for window in &mut self.resolution_windows {
 			window.participants_to_outcome_to_stake
-			.entry(env::current_account_id())
+			.entry(account_id.to_string())
 			.or_insert(HashMap::new())
 			.entry(self.winning_outcome)
 			.and_modify(|staked| {
