@@ -191,9 +191,9 @@ impl Markets {
 			assert_eq!(env::predecessor_account_id(), self.creator, "only the owner can resolute disputed markets");
 		} else {
 			// Check that the first dispute window is closed
-			println!("{:?}",market.resolution_windows.last());
-			// let dispute_window = market.resolution_windows.as_ref().unwrap();
-			// assert!(env::block_timestamp() >= dispute_window.end_time, "dispute window still open")
+			let dispute_window = market.resolution_windows.last().expect("no dispute window found, something went wrong");
+			println!("window: {:?}", dispute_window);
+			assert!(env::block_timestamp() >= dispute_window.end_time || dispute_window.round == 2, "dispute window still open")
 		}
 
         market.finalize(winning_outcome);
@@ -268,7 +268,7 @@ impl Markets {
 
 		let claimable = market.get_claimable(account_id.to_string());
 		market.delete_orders_for(account_id.to_string());
-		market.delete_resolution_for(account_id.to_string());
+		market.delete_resolution_for();
 
 		self.add_balance(claimable);
 	}

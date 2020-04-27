@@ -11,7 +11,7 @@ pub struct ResolutionWindow {
 	pub required_bond_size: u128,
 	pub staked_per_outcome: HashMap<Option<u64>, u128>, // Staked per outcome
 	pub end_time: u64,
-	// Add round outcome and total staked
+	pub outcome: Option<u64>,
 }
 
 pub mod orderbook;
@@ -70,7 +70,8 @@ impl Market {
 			participants_to_outcome_to_stake: HashMap::new(),
 			required_bond_size: 5 * base.pow(17),
 			staked_per_outcome: HashMap::new(), // Staked per outcome
-			end_time: end_time
+			end_time: end_time,
+			outcome: None,
 		};
 
 		Self {
@@ -216,75 +217,122 @@ impl Market {
 		return orderbooks;
 	}
 
-
 	pub fn resolute(
 		&mut self, 
 		winning_outcome: Option<u64>, 
 		stake: u128 // should reimplement this
-	) {
-		// TODO: Make sure market can only be resoluted after end time
+	) -> u128 {
 		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
-		assert_eq!(self.resoluted, false);
-		assert_eq!(self.finalized, false);
+		assert_eq!(self.resoluted, false, "market is already resoluted");
+		assert_eq!(self.finalized, false, "market is already finalized");
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes);
-		assert!(self.resolute_bond > 0, "resolution bond already staked");
-
+		let resolution_window = self.resolution_windows.last_mut().expect("no resolute window exists, something went wrong at creation");
+		assert_eq!(resolution_window.round, 0, "can only resolute once");
+		
 		let mut to_return = 0;
-		let resolution_window = self.resolution_windows.last().unwrap();
+		let staked_on_outcome = resolution_window.staked_per_outcome.get(&winning_outcome).unwrap_or(&0);
 
-		// different check
-		// Refactor
-		if stake >= self.resolute_bond {
+		if stake + staked_on_outcome >= self.resolute_bond {
+			to_return = stake + staked_on_outcome - self.resolute_bond;
 			self.winning_outcome = winning_outcome;
-			self.resoluted = true;	
-			self.resolute_bond = 0;
-			to_return = stake - self.resolute_bond;
-			// set resolution_window.end_time to market end + 30 min
+			self.resoluted = true;
+		} 
 
-		} else {
-			// self.resolute_bond -= bond;
-		}
-
-		// TODO: Stake should be changed to stake - to_return
-		// Set participants and total stake
 		resolution_window.participants_to_outcome_to_stake
 		.entry(env::predecessor_account_id())
 		.or_insert(HashMap::new())
 		.entry(winning_outcome)
-		.and_modify(|staked| {*staked += stake})
+		.and_modify(|staked| {*staked += stake - to_return})
 		.or_insert(stake);
 
 		resolution_window.staked_per_outcome
 		.entry(winning_outcome)
-		.and_modify(|total_staked| {*total_staked += stake});
+		.and_modify(|total_staked| {*total_staked += stake - to_return})
+		.or_insert(stake);
+		
+		if self.resoluted {
+			resolution_window.outcome = winning_outcome;
+			let new_resolution_window = ResolutionWindow {
+				round: resolution_window.round + 1,
+				participants_to_outcome_to_stake: HashMap::new(),
+				required_bond_size: resolution_window.required_bond_size * 2,
+				staked_per_outcome: HashMap::new(), // Staked per outcome
+				end_time: env::block_timestamp() + 36000,
+				outcome: None,
+			};
+			self.resolution_windows.push(new_resolution_window);
+		} 
+
+
+
+		return to_return;
 	}
 
 	pub fn dispute(
 		&mut self, 
 		winning_outcome: Option<u64>,
 		stake: u128
-	) {
+	) -> u128 {
 		assert_eq!(self.resoluted, true, "market isn't resoluted yet");
 		assert_eq!(self.finalized, false, "market is already finalized");
-        assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes || winning_outcome != self.winning_outcome, "invalid winning outcome");
-		
-		let dispute_window = self.resolution_windows.last().unwrap();
-		assert_eq!(dispute_window.round, 1, "for this version, there's only 1 round of dispute. The market is then finalized by the protocol owner");
-		assert!(env::block_timestamp() <= dispute_window.end_time, "dispute window is closed, market can be finalized");
+        assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes, "invalid winning outcome");
+        assert!(winning_outcome != self.winning_outcome, "same oucome as last resolution");
+	
+		let resolution_window = self.resolution_windows.last_mut().expect("Invalid dispute window unwrap");
+		assert_eq!(resolution_window.round, 1, "for this version, there's only 1 round of dispute. The market is then finalized by the protocol owner");
+		assert!(env::block_timestamp() <= resolution_window.end_time, "dispute window is closed, market can be finalized");
 
-		dispute_window.participants_to_outcome_to_stake
+		let full_bond_size = resolution_window.required_bond_size;
+		let mut bond_filled = false;
+		let staked_on_outcome = resolution_window.staked_per_outcome.get(&winning_outcome).unwrap_or(&0);
+		let mut to_return = 0;
+
+		if staked_on_outcome + stake >= full_bond_size  {
+			bond_filled = true;
+			to_return = staked_on_outcome + stake - full_bond_size;
+			self.disputed = true; // Only as long as Judge exists
+			self.winning_outcome = winning_outcome;
+		}
+
+		// Add to disputors stake
+		resolution_window.participants_to_outcome_to_stake
 		.entry(env::predecessor_account_id())
 		.or_insert(HashMap::new())
 		.entry(winning_outcome)
-		.and_modify(|staked| { *staked += stake })
+		.and_modify(|staked| { *staked += stake - to_return })
+		.or_insert(stake);
+
+		// Add to total staked on outcome
+		resolution_window.staked_per_outcome
+		.entry(winning_outcome)
+		.and_modify(|total_staked| {*total_staked += stake - to_return})
 		.or_insert(stake);
 		
-		// If dispute bond is posted, create next dispute round
-		// only for next dispute round
-		// let next_round = dispute_window.round + 1;
-		// self.disputed = true;
-		// self.winning_outcome = winning_outcome;
-		
+		// Check if this order fills the bond
+		if bond_filled {
+			// Set last winning outcome
+			resolution_window.outcome = winning_outcome;
+
+			//
+			resolution_window.staked_per_outcome
+			.entry(winning_outcome)
+			.and_modify(|total_staked| {*total_staked = full_bond_size})
+			.or_insert(stake);
+
+			let next_resolution_window = ResolutionWindow{
+				round: resolution_window.round + 1,
+				participants_to_outcome_to_stake: HashMap::new(),
+				required_bond_size: resolution_window.required_bond_size * 2,
+				staked_per_outcome: HashMap::new(), // Staked per outcome
+				end_time: env::block_timestamp() + 36000,
+				outcome: None,
+				// invalid: false
+			};
+
+			self.resolution_windows.push(next_resolution_window);
+		}
+
+		return to_return;
 	}
 
 	pub fn finalize(
@@ -333,13 +381,25 @@ impl Market {
 		return claimable;
 	}
 
-	// TODO: Think about what to do with all value locked up in previous dispute rounds where the bond didn't get completely filled
-	// option 1: refund
-	// option 2: devide among succesful staker
-	// My thinking: it should be refunded, I think that the bond is only posted when all stake for it is accumilated and until then all 
-	// "stake" is withdrawable. 
-	// This mostly has to do with fairness on fund distribution since non-"bonded" stake didn't end up ina  bond for that outcome 
-	// and should be able to be used during the next dispute window
+	fn cancel_dispute_participation(
+		&mut self,
+		round: u64,
+		outcome: Option<u64>
+	) -> u128{
+		let resolution_window = self.resolution_windows.get_mut(round as usize).expect("dispute round doesn't exist");
+		assert_ne!(outcome, resolution_window.outcome, "you cant cancel dispute stake for bonded outcome");
+		let mut to_return = 0;
+		resolution_window.participants_to_outcome_to_stake
+		.entry(env::predecessor_account_id())
+		.or_insert(HashMap::new())
+		.entry(outcome)
+		.and_modify(|staked| { 
+			to_return = *staked;
+			*staked = 0 ;
+		})
+		.or_insert(0);
+		return to_return;
+	}
 
 	fn get_dispute_earnings(
 		&self, 
@@ -347,35 +407,35 @@ impl Market {
 	) -> u128 {
         let mut user_correctly_staked = 0;
 		let mut total_correctly_staked = 0;
-		
+		let mut total_incorrectly_staked = 0;
 		// need total staked per window
-		for window in self.resolution_windows {
+		for window in &self.resolution_windows {
+			println!("window {:?}", window );
+
+			let empty_map = HashMap::new();
 			let round_participation = window.participants_to_outcome_to_stake
 			.get(&from)
-			.unwrap_or(&HashMap::new())
+			.unwrap_or(&empty_map)
 			.get(&self.winning_outcome)
 			.unwrap_or(&0);
+			
 			let correct_stake = window.staked_per_outcome
 			.get(&self.winning_outcome)
 			.unwrap_or(&0);
 
-			user_correctly_staked += *round_participation;
-			total_correctly_staked += correct_stake;
-		}		
+			let incorrect_stake = window.staked_per_outcome
+			.get(&window.outcome)
+			.unwrap_or(&0);
 
-        for (_, round_vec) in self.resolvers.iter() {
-            for dispute in round_vec.iter() {
-                if dispute.0 == from && dispute.1 == self.winning_outcome {
-                    user_correctly_staked += dispute.2;
-                }
-                if dispute.1 == self.winning_outcome {
-                    total_correctly_staked += dispute.2;
-                }
-                resolute_claimable += dispute.2;
-            }
-        }
-        if total_correctly_staked == 0 {return 0}
-        return user_correctly_staked / total_correctly_staked * resolute_claimable;
+			user_correctly_staked += round_participation;
+			total_correctly_staked += correct_stake;
+			total_incorrectly_staked += incorrect_stake;
+		}
+
+		if total_correctly_staked == 0 {return 0}
+
+		println!("claimable from dispute: {}", user_correctly_staked / total_correctly_staked * total_incorrectly_staked);
+        return user_correctly_staked / total_correctly_staked * total_incorrectly_staked;
 	}
 
     // Updates the best price for an order once initial best price is filled
@@ -495,22 +555,18 @@ impl Market {
 	}
 
 	pub fn delete_resolution_for(
-		&mut self, 
-		from: String
+		&mut self
 	) {
-	     let rounds_to_delete = &mut vec![];
-
-	     for (round, round_vec) in self.resolvers.iter_mut() {
-             for dispute in round_vec.iter() {
-                 if dispute.0 == from {
-                     rounds_to_delete.push(*round);
-                 }
-             }
-         }
-
-         for round in rounds_to_delete {
-            self.resolvers.remove(&round);
-         }
+		for window in &mut self.resolution_windows {
+			window.participants_to_outcome_to_stake
+			.entry(env::current_account_id())
+			.or_insert(HashMap::new())
+			.entry(self.winning_outcome)
+			.and_modify(|staked| {
+				*staked = 0
+			})
+			.or_insert(0);
+		}
 	}
 }
 
