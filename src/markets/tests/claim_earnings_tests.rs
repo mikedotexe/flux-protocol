@@ -16,17 +16,17 @@ fn test_payout() {
 	contract.place_order(0, 2, 1000, 10);
 
 	testing_env!(get_context(carol(), market_end_timestamp()));
-	contract.resolute(0, Some(0));
+	contract.resolute_market(0, None, to_dai(5));
 
 	let initially_claimable_carol = contract.get_claimable(0, carol());
 	let initially_claimable_alice = contract.get_claimable(0, alice());
 
 	let initial_balance_carol = contract.get_fdai_balance(carol());
 	let initial_balance_alice = contract.get_fdai_balance(alice());
+	testing_env!(get_context(carol(), market_end_timestamp() + 1800));
 
     contract.finalize_market(0, Some(0));
 	contract.claim_earnings(0, carol());
-	testing_env!(get_context(alice(), market_end_timestamp()));
 	contract.claim_earnings(0, alice());
 
 	let claimable_after_claim_carol = contract.get_claimable(0, carol());
@@ -37,7 +37,7 @@ fn test_payout() {
 
 	assert_eq!(updated_balance_carol, initially_claimable_carol + initial_balance_carol);
 	assert_eq!(updated_balance_alice, initially_claimable_alice + initial_balance_alice);
+
 	assert_eq!(claimable_after_claim_carol, 0);
 	assert_eq!(claimable_after_claim_alice, 0);
-
 }

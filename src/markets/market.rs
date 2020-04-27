@@ -358,7 +358,7 @@ impl Market {
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 		
-        // Claiming payouts
+		// Claiming payouts
 		if invalid {
 			for (_, orderbook) in self.orderbooks.iter() {
 			    let spent = orderbook.get_spend_by(account_id.to_string());
@@ -373,7 +373,7 @@ impl Market {
 			let winning_value = winning_orderbook.calc_claimable_amt(account_id.to_string());
 			claimable += winning_value * (100-self.fee_percentage)/100;
 		}
-		
+
 		// Claiming Dispute Earnings
         claimable += self.get_dispute_earnings(account_id.to_string());
 		return claimable;
@@ -541,7 +541,7 @@ impl Market {
 	}
 
 
-	pub fn delete_orders_for(
+	pub fn reset_balances_for(
 		&mut self, 
 		account_id: String
 	) {

@@ -20,7 +20,7 @@ fn test_invalid_market_payout_calc() {
 	contract.place_order(0, 2, 2000, 20);
 
 	testing_env!(get_context(carol(), market_end_timestamp()));
-	contract.resolute(0, None);
+	contract.resolute_market(0, None, to_dai(5));
 
 	let claimable_carol = contract.get_claimable(0, carol());
 	let claimable_alice = contract.get_claimable(0, alice());
@@ -64,7 +64,7 @@ fn test_valid_market_payout_calc() {
 	contract.place_order(0, 2, 2000, 20);
 
 	testing_env!(get_context(carol(), market_end_timestamp()));
-	contract.resolute(0, Some(1));
+	contract.resolute_market(0, None, to_dai(5));
 
 	let open_orders_0 = contract.get_open_orders(0, 0);
 	let open_orders_1 = contract.get_open_orders(0, 1);

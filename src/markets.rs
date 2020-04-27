@@ -299,7 +299,7 @@ impl Markets {
 		assert_eq!(market.finalized, true);
 
 		let claimable = market.get_claimable(account_id.to_string());
-		market.delete_orders_for(account_id.to_string());
+		market.reset_balances_for(account_id.to_string());
 		market.delete_resolution_for(account_id.to_string());
 
 		self.add_balance(claimable, account_id);
@@ -497,8 +497,8 @@ mod tests {
 	// mod market_order_tests;
 	// mod binary_order_matching_tests;
 	// mod categorical_market_tests;
-	// mod market_resolution_tests;
-	// mod claim_earnings_tests;
 	// mod market_depth_tests;
-	mod market_dispute_tests;
+	// mod market_dispute_tests;
+	// mod market_resolution_tests;
+	mod claim_earnings_tests;
 }

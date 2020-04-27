@@ -216,8 +216,18 @@ impl Orderbook {
 	) {
 		let empty_vec = &mut vec![];
 		let orders_by_user_copy = self.orders_by_user.get(&account_id).unwrap_or(empty_vec).clone();
-		self.claimed_orders_by_user.insert(account_id.to_string(), orders_by_user_copy);
-        *self.orders_by_user.get_mut(&account_id).unwrap_or(empty_vec) = vec![];
+		
+		self.spend_by_user
+		.entry(account_id.to_string())
+		.and_modify(|spend| { *spend = 0; })
+		.or_insert(0);
+
+		self.claimed_orders_by_user
+		.insert(account_id.to_string(), orders_by_user_copy);
+		
+		*self.orders_by_user
+		.get_mut(&account_id)
+		.unwrap_or(empty_vec) = vec![];
 	}
 
     fn remove_filled_order(
