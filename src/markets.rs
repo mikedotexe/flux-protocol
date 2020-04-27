@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 mod market;
 type Market = market::Market;
 type Order = market::orderbook::order::Order;
-			// TODO: Apearantly child contracts can read the predecessor account as well so we don't need to pass it as "account_id"
+type ResolutionWindow = market::ResolutionWindow;
 
 #[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
@@ -118,8 +118,8 @@ impl Markets {
 		price: u128
 	) {
 		let account_id = env::predecessor_account_id();
-		let balance = self.fdai_balances.get(&account_id).unwrap();
-		assert!(balance >= &spend);
+		let balance = self.get_fdai_balance(account_id.to_string());
+		assert!(balance >= spend, "insufficient balance");
 
 		let amount_of_shares = spend / price;
 		let rounded_spend = amount_of_shares * price;
@@ -151,17 +151,27 @@ impl Markets {
 		winning_outcome: Option<u64>,
 		stake: u128
 	) {
-		// TODO: Calc refund here and take into account before callign child method, this way there's no case in whicih
-		// stake is bigger than bond in child method
 		let account_id = env::predecessor_account_id();
-		let market = self.active_markets.get_mut(&market_id).unwrap();
+		let balance = self.get_fdai_balance(account_id.to_string());
+        assert!(balance >= stake, "not enough balance to cover stake");
+		let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
 		assert_eq!(market.resoluted, false);
 
-		let balance = self.fdai_balances.get(&account_id).unwrap();
-        assert!(balance >= &stake);
 
-		market.resolute(winning_outcome, stake);
-		self.subtract_balance(stake);
+		let change = market.resolute(winning_outcome, stake);
+		self.subtract_balance(stake - change);
+	}
+
+	pub fn cancel_dispute_participation(
+		&mut self, 
+		market_id: u64,
+		dispute_round: u64,
+		outcome: Option<u64>
+	) {
+		let market = self.active_markets.get_mut(&market_id).expect("invalid market");
+		let to_return = market.cancel_dispute_participation(dispute_round, outcome);
+		println!("to_return: {}", to_return);
+		self.add_balance(to_return, env::predecessor_account_id());
 	}
 
 	pub fn dispute_market(
@@ -173,9 +183,9 @@ impl Markets {
 	    let account_id = env::predecessor_account_id();
         let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
 		let balance = self.fdai_balances.get(&account_id).unwrap_or(&0);
-		assert!(balance >= &stake, "not enough balance for staked amount");		
-		market.dispute(winning_outcome, stake);
-        self.subtract_balance(stake);
+		assert!(balance >= &stake, "not enough balance to cover stake");
+		let change = market.dispute(winning_outcome, stake);
+        self.subtract_balance(stake - change);
 	}
 
 	pub fn finalize_market(
@@ -225,6 +235,18 @@ impl Markets {
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
 	}
 
+	pub fn get_active_resolution_window(
+		&self,
+		market_id: u64
+	) -> Option<&ResolutionWindow> {
+		let market = self.active_markets.get(&market_id).expect("market doesn't exist");
+		if !market.resoluted {
+			return None;
+		}
+		return Some(market.resolution_windows.last().expect("invalid dispute window"));
+
+	}
+
 	pub fn get_open_orders(
 		&self, 
 		market_id: u64, 
@@ -259,9 +281,11 @@ impl Markets {
 	) {
 		let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
 		let creator = market.creator.to_string();
-		assert_eq!(market.fee_claimed, false);
-		assert_eq!(env::predecessor_account_id(), creator.to_string());
-		let fee_payout = market.fee_percentage * market.liquidity / 100;
+		assert_eq!(market.fee_claimed, false, "creator already claimed fees");
+		assert_eq!(env::predecessor_account_id(), creator.to_string(), "only creator himself can claim the fees");
+		// TODO: liquidity, as it is now is not the right metric, filled volume would be
+		let fee_payout = market.liquidity * market.fee_percentage / 100;
+		println!("liq {}", market.liquidity);
 		market.fee_claimed = true;
 		self.add_balance(fee_payout, creator.to_string());
 	}

@@ -115,7 +115,7 @@ impl Market {
 		assert!(env::block_timestamp() < self.end_time);
 		let (spend_left, shares_filled) = self.fill_matches(outcome, spend, price);
 		let total_spend = spend - spend_left;
-		self.liquidity += shares_filled * price * (100/price);
+		self.liquidity += shares_filled * 100;
 		let shares_filled = shares_filled;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
 		orderbook.place_order(account_id, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
@@ -227,7 +227,6 @@ impl Market {
 		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false, "market is already resoluted");
 		assert_eq!(self.finalized, false, "market is already finalized");
-		println!("{:?}  {}", winning_outcome, self.outcomes);
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes, "invalid winning outcome");
 		let resolution_window = self.resolution_windows.last_mut().expect("no resolute window exists, something went wrong at creation");
 		assert_eq!(resolution_window.round, 0, "can only resolute once");
@@ -282,7 +281,7 @@ impl Market {
         assert!(winning_outcome != self.winning_outcome, "same oucome as last resolution");
 	
 		let resolution_window = self.resolution_windows.last_mut().expect("Invalid dispute window unwrap");
-		assert_eq!(resolution_window.round, 1, "for this version, there's only 1 round of dispute. The market is then finalized by the protocol owner");
+		assert_eq!(resolution_window.round, 1, "for this version, there's only 1 round of dispute");
 		assert!(env::block_timestamp() <= resolution_window.end_time, "dispute window is closed, market can be finalized");
 
 		let full_bond_size = resolution_window.required_bond_size;
@@ -369,7 +368,7 @@ impl Market {
 			for (_, orderbook) in self.orderbooks.iter() {
 				claimable += orderbook.get_open_order_value_for(account_id.to_string());
 			}
-			println!("in open orders: {}", claimable);
+
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
 			let winning_value = winning_orderbook.calc_claimable_amt(account_id.to_string());
 			claimable += winning_value * (100-self.fee_percentage)/100;
@@ -380,13 +379,15 @@ impl Market {
 		return claimable;
 	}
 
-	fn cancel_dispute_participation(
+	pub fn cancel_dispute_participation(
 		&mut self,
 		round: u64,
 		outcome: Option<u64>
 	) -> u128{
 		let resolution_window = self.resolution_windows.get_mut(round as usize).expect("dispute round doesn't exist");
+		println!("{:?} {:?} ", outcome, resolution_window.outcome);
 		assert_ne!(outcome, resolution_window.outcome, "you cant cancel dispute stake for bonded outcome");
+		assert_ne!(outcome, self.winning_outcome, "you cant cancel dispute stake for winning outcome");
 		let mut to_return = 0;
 		resolution_window.participants_to_outcome_to_stake
 		.entry(env::predecessor_account_id())
@@ -397,6 +398,7 @@ impl Market {
 			*staked = 0 ;
 		})
 		.or_insert(0);
+
 		return to_return;
 	}
 
@@ -431,7 +433,7 @@ impl Market {
 
 		if total_correctly_staked == 0 {return 0}
 
-        return user_correctly_staked / total_correctly_staked * total_incorrectly_staked;
+        return user_correctly_staked * 100 / total_correctly_staked * total_incorrectly_staked / 100;
 	}
 
     // Updates the best price for an order once initial best price is filled
