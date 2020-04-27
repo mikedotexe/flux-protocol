@@ -170,7 +170,6 @@ impl Markets {
 	) {
 		let market = self.active_markets.get_mut(&market_id).expect("invalid market");
 		let to_return = market.cancel_dispute_participation(dispute_round, outcome);
-		println!("to_return: {}", to_return);
 		self.add_balance(to_return, env::predecessor_account_id());
 	}
 
@@ -285,7 +284,6 @@ impl Markets {
 		assert_eq!(env::predecessor_account_id(), creator.to_string(), "only creator himself can claim the fees");
 		// TODO: liquidity, as it is now is not the right metric, filled volume would be
 		let fee_payout = market.liquidity * market.fee_percentage / 100;
-		println!("liq {}", market.liquidity);
 		market.fee_claimed = true;
 		self.add_balance(fee_payout, creator.to_string());
 	}

@@ -385,7 +385,6 @@ impl Market {
 		outcome: Option<u64>
 	) -> u128{
 		let resolution_window = self.resolution_windows.get_mut(round as usize).expect("dispute round doesn't exist");
-		println!("{:?} {:?} ", outcome, resolution_window.outcome);
 		assert_ne!(outcome, resolution_window.outcome, "you cant cancel dispute stake for bonded outcome");
 		assert_ne!(outcome, self.winning_outcome, "you cant cancel dispute stake for winning outcome");
 		let mut to_return = 0;
