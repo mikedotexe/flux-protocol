@@ -142,7 +142,8 @@ impl Markets {
 		let mut orderbook = market.orderbooks.get_mut(&outcome).unwrap();
 		let order = orderbook.open_orders.get(&order_id).unwrap();
 		assert!(account_id == order.creator);
-		orderbook.remove_order(order_id);
+		let to_return = orderbook.remove_order(order_id);
+		self.add_balance(to_return, account_id);
     }
 
 	pub fn resolute_market(
