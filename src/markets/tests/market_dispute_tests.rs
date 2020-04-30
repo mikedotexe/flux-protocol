@@ -202,12 +202,12 @@ fn test_cancel_dispute_participation() {
 	let fdai_before_withdrawl_alice = contract.get_fdai_balance(alice());
 
 	testing_env!(get_context(alice(), market_end_timestamp()));
-	contract.cancel_dispute_participation(0, 0, Some(1));
+	contract.withdraw_dispute_stake(0, 0, Some(1));
 	let fdai_after_withdrawl_alice = contract.get_fdai_balance(alice());
 	assert_eq!(fdai_after_withdrawl_alice, fdai_before_withdrawl_alice + to_dai(4));
 
 	testing_env!(get_context(carol(), market_end_timestamp()));
-	contract.cancel_dispute_participation(0, 1, Some(0));
+	contract.withdraw_dispute_stake(0, 1, Some(0));
 	
 }
 

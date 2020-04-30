@@ -224,7 +224,7 @@ impl Orderbook {
 
 		self.claimed_orders_by_user
 		.insert(account_id.to_string(), orders_by_user_copy);
-		
+
 		*self.orders_by_user
 		.get_mut(&account_id)
 		.unwrap_or(empty_vec) = vec![];
@@ -278,6 +278,7 @@ impl Orderbook {
 		return *self.spend_by_user.get(&account_id).unwrap_or(&0);
 	}
 
+	// TODO test if decrements on order fill
 	pub fn get_liquidity_at_price(
 		&self, 
 		price: u128

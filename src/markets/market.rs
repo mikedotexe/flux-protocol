@@ -18,6 +18,7 @@ pub mod orderbook;
 type Orderbook = orderbook::Orderbook;
 type Order = orderbook::Order;
 
+#[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 pub struct Market {
 	pub id: u64,
@@ -101,7 +102,7 @@ impl Market {
 		}
 	}
 
-	pub fn place_order(
+	pub fn create_order(
 		&mut self, 
 		account_id: String, 
 		outcome: u64, 
@@ -112,7 +113,7 @@ impl Market {
 		assert!(spend > 0);
 		assert!(price > 0 && price < 100);
 		assert_eq!(self.resoluted, false);
-		assert!(env::block_timestamp() < self.end_time);
+		assert!(env::block_timestamp() / 1000000 < self.end_time);
 		let (spend_left, shares_filled) = self.fill_matches(outcome, spend, price);
 		let total_spend = spend - spend_left;
 		self.liquidity += shares_filled * 100;
@@ -127,7 +128,7 @@ impl Market {
 		spend: u128, 
 		price: u128
 	) -> (u128, u128) {
-		let mut market_price = self.get_market_price(outcome);
+		let mut market_price = self.get_market_price_for(outcome);
 		if market_price > price { return (spend,0) }
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
 
@@ -153,7 +154,7 @@ impl Market {
 
 			spendable -= shares_to_fill * market_price;
 			shares_filled += shares_to_fill;
-			market_price = self.get_market_price(outcome);
+			market_price = self.get_market_price_for(outcome);
 		}
 
 		return (spendable, shares_filled);
@@ -175,18 +176,18 @@ impl Market {
 		return shares.unwrap();
 	}
 
-	pub fn get_market_prices(
+	pub fn get_market_prices_for(
 		&self
 	) -> BTreeMap<u64, u128> {
 		let mut market_prices: BTreeMap<u64, u128> = BTreeMap::new();
 		for outcome in 0..self.outcomes {
-			let market_price = self.get_market_price(outcome);
+			let market_price = self.get_market_price_for(outcome);
 			market_prices.insert(outcome, market_price);
 		}
 		return market_prices;
 	}
 
-	pub fn get_market_price(
+	pub fn get_market_price_for(
 		&self, 
 		outcome: u64
 	) -> u128 {
@@ -351,7 +352,7 @@ impl Market {
 	    self.finalized = true;
 	}
 
-	pub fn get_claimable(
+	pub fn get_claimable_for(
 		&self, 
 		account_id: String
 	) -> u128 {
@@ -511,7 +512,7 @@ impl Market {
 		let mut outcome_to_price_share_pointer: HashMap<u64,  (u128, u128)> = HashMap::new();
 		let mut max_spend = 0;
 		let mut max_shares = 0;
-		let mut market_price = self.get_market_price(outcome);
+		let mut market_price = self.get_market_price_for(outcome);
 		let mut best_order_exists = true;
 		let mut lowest_liquidity = 0;
 		let mut first_iteration = true;
@@ -568,3 +569,31 @@ impl Market {
 	}
 }
 
+impl Default for Market {
+	fn default() -> Self {
+		Self {
+			id: 0,
+			description: "".to_string(),
+			extra_info: "".to_string(),
+			creator: "".to_string(),
+			outcomes: 0,
+			outcome_tags: vec![],
+			categories: vec![],
+			last_price_for_outcomes: HashMap::new(),
+			creation_time: 0,
+			end_time: 0,
+			orderbooks: BTreeMap::new(),
+			winning_outcome: None,
+			resoluted: false,
+			resolute_bond: 0,
+			liquidity: 0,
+			disputed: false,
+			finalized: false,
+			fee_claimed: false,
+			fee_percentage: 0,
+			cost_percentage: 0,
+			api_source: "".to_string(),
+			resolution_windows: vec![]
+		}
+	}
+}

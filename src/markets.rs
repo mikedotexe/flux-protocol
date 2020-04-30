@@ -124,7 +124,7 @@ impl Markets {
 		let amount_of_shares = spend / price;
 		let rounded_spend = amount_of_shares * price;
 		let market = self.active_markets.get_mut(&market_id).unwrap();
-		market.place_order(account_id.to_string(), outcome, amount_of_shares, rounded_spend, price);
+		market.create_order(account_id.to_string(), outcome, amount_of_shares, rounded_spend, price);
 
 		self.subtract_balance(rounded_spend);
 	}
@@ -163,7 +163,7 @@ impl Markets {
 		self.subtract_balance(stake - change);
 	}
 
-	pub fn cancel_dispute_participation(
+	pub fn withdraw_dispute_stake(
 		&mut self, 
 		market_id: u64,
 		dispute_round: u64,
@@ -272,7 +272,7 @@ impl Markets {
 		market_id: u64, 
 		account_id: String
 	) -> u128 {
-		return self.active_markets.get(&market_id).unwrap().get_claimable(account_id);
+		return self.active_markets.get(&market_id).unwrap().get_claimable_for(account_id);
 	}
 
 	pub fn claim_creator_fee(
@@ -299,7 +299,7 @@ impl Markets {
 		assert_eq!(market.resoluted, true);
 		assert_eq!(market.finalized, true);
 
-		let claimable = market.get_claimable(account_id.to_string());
+		let claimable = market.get_claimable_for(account_id.to_string());
 		market.reset_balances_for(account_id.to_string());
 		market.delete_resolution_for(account_id.to_string());
 
@@ -377,7 +377,7 @@ impl Markets {
 		outcome: u64
 	) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
-		return market.get_market_price(outcome);
+		return market.get_market_price_for(outcome);
 	}
 
 	pub fn get_best_prices(
@@ -385,7 +385,7 @@ impl Markets {
 		market_id: u64
 	) -> BTreeMap<u64, u128> {
 		let market = self.active_markets.get(&market_id).unwrap();
-		return market.get_market_prices();
+		return market.get_market_prices_for();
 	}
 
 	pub fn get_fdai_metrics(
