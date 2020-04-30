@@ -94,7 +94,7 @@ impl Markets {
 		let account_id = env::predecessor_account_id();
 
 		// TODO: Escrow bond account_id creator's account
-		let new_market = Market::new(self.nonce, account_id, description, extra_info, outcomes, outcome_tags, categories, end_time, fee_percentage, cost_percentage, api_source);
+		let new_market = Market::new(self.nonce, account_id, description, extra_info, outcomes, outcome_tags, categories, end_time / 1000000, fee_percentage, cost_percentage, api_source);
 		let market_id = new_market.id;
 		self.active_markets.insert(self.nonce, new_market);
 		self.nonce = self.nonce + 1;
@@ -200,7 +200,8 @@ impl Markets {
 		} else {
 			// Check that the first dispute window is closed
 			let dispute_window = market.resolution_windows.last().expect("no dispute window found, something went wrong");
-			assert!(env::block_timestamp() >= dispute_window.end_time || dispute_window.round == 2, "dispute window still open")
+			println!("{} {}", env::block_timestamp() / 1000000, dispute_window.end_time);
+			assert!(env::block_timestamp() / 1000000 >= dispute_window.end_time || dispute_window.round == 2, "dispute window still open")
 		}
 
         market.finalize(winning_outcome);
@@ -295,7 +296,7 @@ impl Markets {
 		account_id: String
 	) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
-		assert!(env::block_timestamp() >= market.end_time, "market hasn't ended yet");
+		assert!(env::block_timestamp() / 1000000 >= market.end_time, "market hasn't ended yet");
 		assert_eq!(market.resoluted, true);
 		assert_eq!(market.finalized, true);
 
@@ -464,10 +465,10 @@ mod tests {
 	}
 	
 	fn market_creation_timestamp() -> u64 {
-		return 12378;
+		return 1237800000;
 	}
 	fn market_end_timestamp() -> u64 {
-		return 12379000000;
+		return 1237900000000000;
 	}
 
 	fn get_context(
@@ -499,7 +500,7 @@ mod tests {
 	mod binary_order_matching_tests;
 	mod categorical_market_tests;
 	mod market_depth_tests;
+	mod claim_earnings_tests;
 	mod market_dispute_tests;
 	mod market_resolution_tests;
-	mod claim_earnings_tests;
 }

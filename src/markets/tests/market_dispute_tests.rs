@@ -63,7 +63,7 @@ fn test_finalized_market() {
 	let mut contract = init_tests();
 	testing_env!(get_context(carol(), market_end_timestamp()));
 	contract.resolute_market(0, Some(0), to_dai(5));
-	testing_env!(get_context(judge(), market_end_timestamp() + 1800));
+	testing_env!(get_context(judge(), market_end_timestamp() + 1800000000000));
 	contract.finalize_market(0, None);
 	testing_env!(get_context(carol(), market_end_timestamp()));
 	contract.dispute_market(0, Some(1), to_dai(5));
@@ -84,7 +84,7 @@ fn test_dispute_after_dispute_window() {
 	let mut contract = init_tests();
 	testing_env!(get_context(carol(), market_end_timestamp()));
 	contract.resolute_market(0, Some(0), to_dai(5));
-	testing_env!(get_context(carol(), market_end_timestamp() + 1801));
+	testing_env!(get_context(carol(), market_end_timestamp() + 1800100000000));
 	contract.dispute_market(0, None, to_dai(5));
 }
 
@@ -95,7 +95,7 @@ fn test_finalize_as_not_owner() {
 	testing_env!(get_context(carol(), market_end_timestamp()));
 	contract.resolute_market(0, Some(0), to_dai(5));
 	contract.dispute_market(0, None, to_dai(10));
-	testing_env!(get_context(carol(), market_end_timestamp() + 1800));
+	testing_env!(get_context(carol(), market_end_timestamp() + 1800000000000));
 	contract.finalize_market(0, None);
 }
 
@@ -166,7 +166,7 @@ fn test_fee_claim() {
 	contract.place_order(0, 1, to_dai(9), 90);
 	testing_env!(get_context(carol(), market_end_timestamp()));
 	contract.resolute_market(0, Some(0), to_dai(5));
-	testing_env!(get_context(carol(), market_end_timestamp() + 1800));
+	testing_env!(get_context(carol(), market_end_timestamp() + 1800000000000));
 	contract.finalize_market(0, None);
 
 	let balance_before_claim = contract.get_fdai_balance(carol());

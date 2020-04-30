@@ -225,7 +225,7 @@ impl Market {
 		winning_outcome: Option<u64>, 
 		stake: u128 // should reimplement this
 	) -> u128 {
-		assert!(env::block_timestamp() >= self.end_time, "market hasn't ended yet");
+		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false, "market is already resoluted");
 		assert_eq!(self.finalized, false, "market is already finalized");
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes, "invalid winning outcome");
@@ -260,7 +260,7 @@ impl Market {
 				participants_to_outcome_to_stake: HashMap::new(),
 				required_bond_size: resolution_window.required_bond_size * 2,
 				staked_per_outcome: HashMap::new(), // Staked per outcome
-				end_time: env::block_timestamp() + 1800, // 30 nano minutes should be 30 minutes
+				end_time: env::block_timestamp() / 1000000 + 1800000, // 30 nano minutes should be 30 minutes
 				outcome: None,
 			};
 			self.resolution_windows.push(new_resolution_window);
@@ -283,7 +283,7 @@ impl Market {
 	
 		let resolution_window = self.resolution_windows.last_mut().expect("Invalid dispute window unwrap");
 		assert_eq!(resolution_window.round, 1, "for this version, there's only 1 round of dispute");
-		assert!(env::block_timestamp() <= resolution_window.end_time, "dispute window is closed, market can be finalized");
+		assert!(env::block_timestamp() / 1000000 <= resolution_window.end_time, "dispute window is closed, market can be finalized");
 
 		let full_bond_size = resolution_window.required_bond_size;
 		let mut bond_filled = false;
@@ -327,7 +327,7 @@ impl Market {
 				participants_to_outcome_to_stake: HashMap::new(),
 				required_bond_size: resolution_window.required_bond_size * 2,
 				staked_per_outcome: HashMap::new(), // Staked per outcome
-				end_time: env::block_timestamp() + 36000,
+				end_time: env::block_timestamp() / 1000000 + 1800000,
 				outcome: None,
 				// invalid: false
 			};
@@ -567,6 +567,7 @@ impl Market {
 			.or_insert(0);
 		}
 	}
+
 }
 
 impl Default for Market {
