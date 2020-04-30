@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
 pub struct ResolutionWindow {
 	pub round: u64,
-	pub participants_to_outcome_to_stake: HashMap<String, HashMap<Option<u64>, u128>>, // Account to outcome to stake
+	pub participants_to_outcome_to_stake: HashMap<String, HashMap<u64, u128>>, // Account to outcome to stake
 	pub required_bond_size: u128,
-	pub staked_per_outcome: HashMap<Option<u64>, u128>, // Staked per outcome
+	pub staked_per_outcome: HashMap<u64, u128>, // Staked per outcome
 	pub end_time: u64,
 	pub outcome: Option<u64>,
 }
@@ -32,7 +32,7 @@ pub struct Market {
 	pub creation_time: u64,
 	pub end_time: u64,
 	pub orderbooks: BTreeMap<u64, orderbook::Orderbook>,
-	pub winning_outcome: Option<u64>,
+	pub winning_outcome: Option<u64>, // invalid has outcome id: self.outcomes
 	pub resoluted: bool,
 	pub resolute_bond: u128,
 	pub liquidity: u128,
@@ -220,6 +220,13 @@ impl Market {
 		return orderbooks;
 	}
 
+	fn to_numerical_outcome(
+		&self, 
+		outcome: Option<u64>, 
+	) -> u64 {
+		return outcome.unwrap_or(self.outcomes);
+	}
+
 	pub fn resolute(
 		&mut self, 
 		winning_outcome: Option<u64>, 
@@ -229,11 +236,12 @@ impl Market {
 		assert_eq!(self.resoluted, false, "market is already resoluted");
 		assert_eq!(self.finalized, false, "market is already finalized");
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes, "invalid winning outcome");
+		let outcome_id = self.to_numerical_outcome(winning_outcome);
 		let resolution_window = self.resolution_windows.last_mut().expect("no resolute window exists, something went wrong at creation");
 		assert_eq!(resolution_window.round, 0, "can only resolute once");
 		
 		let mut to_return = 0;
-		let staked_on_outcome = resolution_window.staked_per_outcome.get(&winning_outcome).unwrap_or(&0);
+		let staked_on_outcome = resolution_window.staked_per_outcome.get(&outcome_id).unwrap_or(&0);
 
 		if stake + staked_on_outcome >= self.resolute_bond {
 			to_return = stake + staked_on_outcome - self.resolute_bond;
@@ -244,12 +252,12 @@ impl Market {
 		resolution_window.participants_to_outcome_to_stake
 		.entry(env::predecessor_account_id())
 		.or_insert(HashMap::new())
-		.entry(winning_outcome)
+		.entry(outcome_id)
 		.and_modify(|staked| {*staked += stake - to_return})
 		.or_insert(stake);
 
 		resolution_window.staked_per_outcome
-		.entry(winning_outcome)
+		.entry(outcome_id)
 		.and_modify(|total_staked| {*total_staked += stake - to_return})
 		.or_insert(stake);
 		
@@ -281,13 +289,14 @@ impl Market {
         assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes, "invalid winning outcome");
         assert!(winning_outcome != self.winning_outcome, "same oucome as last resolution");
 	
+		let outcome_id = self.to_numerical_outcome(winning_outcome);
 		let resolution_window = self.resolution_windows.last_mut().expect("Invalid dispute window unwrap");
 		assert_eq!(resolution_window.round, 1, "for this version, there's only 1 round of dispute");
 		assert!(env::block_timestamp() / 1000000 <= resolution_window.end_time, "dispute window is closed, market can be finalized");
 
 		let full_bond_size = resolution_window.required_bond_size;
 		let mut bond_filled = false;
-		let staked_on_outcome = resolution_window.staked_per_outcome.get(&winning_outcome).unwrap_or(&0);
+		let staked_on_outcome = resolution_window.staked_per_outcome.get(&outcome_id).unwrap_or(&0);
 		let mut to_return = 0;
 
 		if staked_on_outcome + stake >= full_bond_size  {
@@ -301,13 +310,13 @@ impl Market {
 		resolution_window.participants_to_outcome_to_stake
 		.entry(env::predecessor_account_id())
 		.or_insert(HashMap::new())
-		.entry(winning_outcome)
+		.entry(outcome_id)
 		.and_modify(|staked| { *staked += stake - to_return })
 		.or_insert(stake);
 
 		// Add to total staked on outcome
 		resolution_window.staked_per_outcome
-		.entry(winning_outcome)
+		.entry(outcome_id)
 		.and_modify(|total_staked| {*total_staked += stake - to_return})
 		.or_insert(stake);
 		
@@ -318,7 +327,7 @@ impl Market {
 
 			//
 			resolution_window.staked_per_outcome
-			.entry(winning_outcome)
+			.entry(outcome_id)
 			.and_modify(|total_staked| {*total_staked = full_bond_size})
 			.or_insert(stake);
 
@@ -385,6 +394,7 @@ impl Market {
 		round: u64,
 		outcome: Option<u64>
 	) -> u128{
+		let outcome_id = self.to_numerical_outcome(outcome);
 		let resolution_window = self.resolution_windows.get_mut(round as usize).expect("dispute round doesn't exist");
 		assert_ne!(outcome, resolution_window.outcome, "you cant cancel dispute stake for bonded outcome");
 		assert_ne!(outcome, self.winning_outcome, "you cant cancel dispute stake for winning outcome");
@@ -392,7 +402,7 @@ impl Market {
 		resolution_window.participants_to_outcome_to_stake
 		.entry(env::predecessor_account_id())
 		.or_insert(HashMap::new())
-		.entry(outcome)
+		.entry(outcome_id)
 		.and_modify(|staked| { 
 			to_return = *staked;
 			*staked = 0 ;
@@ -412,18 +422,21 @@ impl Market {
 		// need total staked per window
 		for window in &self.resolution_windows {
 			let empty_map = HashMap::new();
+			let winning_outcome_id = self.to_numerical_outcome(self.winning_outcome);
+			let window_outcome_id = self.to_numerical_outcome(window.outcome);
 			let round_participation = window.participants_to_outcome_to_stake
 			.get(&account_id)
 			.unwrap_or(&empty_map)
-			.get(&self.winning_outcome)
+			.get(&winning_outcome_id)
 			.unwrap_or(&0);
 			
 			let correct_stake = window.staked_per_outcome
-			.get(&self.winning_outcome)
+			.get(&winning_outcome_id)
 			.unwrap_or(&0);
 
+
 			let incorrect_stake = window.staked_per_outcome
-			.get(&window.outcome)
+			.get(&window_outcome_id)
 			.unwrap_or(&0);
 
 			user_correctly_staked += round_participation;
@@ -556,11 +569,12 @@ impl Market {
 		&mut self,
 		account_id: String,
 	) {
+		let outcome_id = self.to_numerical_outcome(self.winning_outcome);
 		for window in &mut self.resolution_windows {
 			window.participants_to_outcome_to_stake
 			.entry(account_id.to_string())
 			.or_insert(HashMap::new())
-			.entry(self.winning_outcome)
+			.entry(outcome_id)
 			.and_modify(|staked| {
 				*staked = 0
 			})

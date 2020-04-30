@@ -4,7 +4,7 @@ fn test_categorical_market_automated_matcher() {
 	testing_env!(get_context(carol(), current_block_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(),  market_end_timestamp(), 0, 0, "test".to_string());
+	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(),  market_end_timestamp_ms(), 0, 0, "test".to_string());
 
 	// best prices - market price = 10
 	contract.place_order(0, 0, 3000, 30);

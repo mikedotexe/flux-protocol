@@ -5,7 +5,7 @@ fn test_invalid_market_payout_calc() {
 	testing_env!(get_context(carol(), current_block_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), market_end_timestamp(), 0, 0, "test".to_string());
+	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), market_end_timestamp_ms(), 0, 0, "test".to_string());
 
 	contract.place_order(0, 0, 7000, 70);
 	contract.place_order(0, 1, 1000, 10);
@@ -19,7 +19,7 @@ fn test_invalid_market_payout_calc() {
 	contract.place_order(0, 1, 2000, 20);
 	contract.place_order(0, 2, 2000, 20);
 
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.resolute_market(0, None, to_dai(5));
 
 	let claimable_carol = contract.get_claimable(0, carol());
@@ -54,7 +54,7 @@ fn test_valid_market_payout_calc() {
 	testing_env!(get_context(carol(), current_block_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), market_end_timestamp(), 0, 0, "test".to_string());
+	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), market_end_timestamp_ms(), 0, 0, "test".to_string());
 
 	contract.place_order(0, 0, 7000, 70);
 
@@ -63,7 +63,7 @@ fn test_valid_market_payout_calc() {
 	contract.place_order(0, 1, 1000, 10);
 	contract.place_order(0, 2, 2000, 20);
 
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.resolute_market(0, Some(1), to_dai(5));
 
 	let open_orders_0 = contract.get_open_orders(0, 0);

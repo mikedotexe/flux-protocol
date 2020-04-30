@@ -4,7 +4,7 @@ fn init_tests() -> Markets {
 	testing_env!(get_context(carol(), current_block_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), market_end_timestamp(), 4, 2, "test".to_string());
+	contract.create_market("Hi!".to_string(), empty_string(), 4, outcome_tags(4), categories(), market_end_timestamp_ms(), 4, 2, "test".to_string());
 	return contract;
 }
 
@@ -20,11 +20,11 @@ fn test_dispute_valid() {
 	contract.place_order(0, 1, to_dai(1), 10);
 	contract.place_order(0, 2, to_dai(1), 10);
 
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
     contract.resolute_market(0, Some(0), to_dai(5));
-    testing_env!(get_context(alice(), market_end_timestamp()));
+    testing_env!(get_context(alice(), market_end_timestamp_ns()));
 	contract.dispute_market(0, Some(1), to_dai(10));
-    testing_env!(get_context(judge(), market_end_timestamp()));
+    testing_env!(get_context(judge(), market_end_timestamp_ns()));
     contract.finalize_market(0, Some(0));
 
 
@@ -61,11 +61,11 @@ fn test_market_not_resoluted() {
 #[should_panic(expected = "market is already finalized")]
 fn test_finalized_market() {
 	let mut contract = init_tests();
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.resolute_market(0, Some(0), to_dai(5));
-	testing_env!(get_context(judge(), market_end_timestamp() + 1800000000000));
+	testing_env!(get_context(judge(), market_end_timestamp_ns() + 1800000000000));
 	contract.finalize_market(0, None);
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.dispute_market(0, Some(1), to_dai(5));
 }
 
@@ -73,7 +73,7 @@ fn test_finalized_market() {
 #[should_panic(expected = "dispute window still open")]
 fn test_market_finalization_pre_dispute_window_close() {
 	let mut contract = init_tests();
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
     contract.resolute_market(0, Some(0), to_dai(5));
 	contract.finalize_market(0, None);
 }
@@ -82,9 +82,9 @@ fn test_market_finalization_pre_dispute_window_close() {
 #[should_panic(expected = "dispute window is closed, market can be finalized")]
 fn test_dispute_after_dispute_window() {
 	let mut contract = init_tests();
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.resolute_market(0, Some(0), to_dai(5));
-	testing_env!(get_context(carol(), market_end_timestamp() + 1800100000000));
+	testing_env!(get_context(carol(), market_end_timestamp_ns() + 1800100000000));
 	contract.dispute_market(0, None, to_dai(5));
 }
 
@@ -92,10 +92,10 @@ fn test_dispute_after_dispute_window() {
 #[should_panic(expected = "only the judge can resolute disputed markets")]
 fn test_finalize_as_not_owner() {
 	let mut contract = init_tests();
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.resolute_market(0, Some(0), to_dai(5));
 	contract.dispute_market(0, None, to_dai(10));
-	testing_env!(get_context(carol(), market_end_timestamp() + 1800000000000));
+	testing_env!(get_context(carol(), market_end_timestamp_ns() + 1800000000000));
 	contract.finalize_market(0, None);
 }
 
@@ -103,7 +103,7 @@ fn test_finalize_as_not_owner() {
 #[should_panic(expected = "invalid winning outcome")]
 fn test_invalid_dispute_outcome() {
 	let mut contract = init_tests();
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.resolute_market(0, Some(4), to_dai(5));
 }
 
@@ -111,7 +111,7 @@ fn test_invalid_dispute_outcome() {
 #[should_panic(expected = "same oucome as last resolution")]
 fn test_dispute_with_same_outcome() {
 	let mut contract = init_tests();
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.resolute_market(0, Some(3), to_dai(5));
 	contract.dispute_market(0, Some(3), to_dai(10));
 }
@@ -120,7 +120,7 @@ fn test_dispute_with_same_outcome() {
 #[should_panic(expected = "for this version, there's only 1 round of dispute")]
 fn test_dispute_escalation_failure() {
 	let mut contract = init_tests();
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.resolute_market(0, Some(3), to_dai(5));
 	contract.dispute_market(0, Some(2), to_dai(10));
 	contract.dispute_market(0, Some(3), to_dai(20));
@@ -129,7 +129,7 @@ fn test_dispute_escalation_failure() {
 #[test]
 fn test_stake_refund() {
 	let mut contract = init_tests();
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 
 	let pre_resolution_balance = contract.get_fdai_balance(carol());
 	let post_resolution_expected_balance = pre_resolution_balance - to_dai(5);
@@ -153,7 +153,7 @@ fn test_stake_refund() {
 #[should_panic(expected = "not enough balance to cover stake")]
 fn test_insufficient_balance() {
 	let mut contract = init_tests();
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.resolute_market(0, Some(3), to_dai(101));
 
 }
@@ -164,9 +164,9 @@ fn test_fee_claim() {
 	let mut contract = init_tests();
 	contract.place_order(0, 0, to_dai(1), 10);
 	contract.place_order(0, 1, to_dai(9), 90);
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.resolute_market(0, Some(0), to_dai(5));
-	testing_env!(get_context(carol(), market_end_timestamp() + 1800000000000));
+	testing_env!(get_context(carol(), market_end_timestamp_ns() + 1800000000000));
 	contract.finalize_market(0, None);
 
 	let balance_before_claim = contract.get_fdai_balance(carol());
@@ -187,26 +187,26 @@ fn test_cancel_dispute_participation() {
 	contract.place_order(0, 0, to_dai(10), 70);
 	contract.place_order(0, 3, to_dai(1), 10);
 
-	testing_env!(get_context(alice(), market_end_timestamp()));
+	testing_env!(get_context(alice(), market_end_timestamp_ns()));
 	contract.claim_fdai();
 	contract.resolute_market(0, Some(1), to_dai(4));
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
     contract.resolute_market(0, Some(0), to_dai(5));
-	testing_env!(get_context(alice(), market_end_timestamp()));
+	testing_env!(get_context(alice(), market_end_timestamp_ns()));
 	contract.dispute_market(0, Some(1), to_dai(10));
-    testing_env!(get_context(judge(), market_end_timestamp()));
+    testing_env!(get_context(judge(), market_end_timestamp_ns()));
 	contract.finalize_market(0, Some(0));
 	
 	contract.claim_earnings(0, alice());
 
 	let fdai_before_withdrawl_alice = contract.get_fdai_balance(alice());
 
-	testing_env!(get_context(alice(), market_end_timestamp()));
+	testing_env!(get_context(alice(), market_end_timestamp_ns()));
 	contract.withdraw_dispute_stake(0, 0, Some(1));
 	let fdai_after_withdrawl_alice = contract.get_fdai_balance(alice());
 	assert_eq!(fdai_after_withdrawl_alice, fdai_before_withdrawl_alice + to_dai(4));
 
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.withdraw_dispute_stake(0, 1, Some(0));
 	
 }
@@ -215,24 +215,24 @@ fn test_cancel_dispute_participation() {
 fn test_crowdsourced_dispute_resolution() {
 	let mut contract = init_tests();
 
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.resolute_market(0, Some(0), to_dai(3));
-	testing_env!(get_context(alice(), market_end_timestamp()));
+	testing_env!(get_context(alice(), market_end_timestamp_ns()));
 	contract.claim_fdai();
 	contract.resolute_market(0, Some(0), to_dai(2));
 	
 	let resolution_window_0 = contract.get_active_resolution_window(0);
 	assert_eq!(resolution_window_0.expect("None value instead of 1st dispute window").round, 1);
 
-	testing_env!(get_context(carol(), market_end_timestamp()));
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
 	contract.dispute_market(0, Some(1), to_dai(5));
-	testing_env!(get_context(alice(), market_end_timestamp()));
+	testing_env!(get_context(alice(), market_end_timestamp_ns()));
 	contract.dispute_market(0, Some(1), to_dai(5));
 
 	let resolution_window_1 = contract.get_active_resolution_window(0);
 	assert_eq!(resolution_window_1.expect("None value instead of 2nd dispute window").round, 2);
 
-	testing_env!(get_context(judge(), market_end_timestamp()));
+	testing_env!(get_context(judge(), market_end_timestamp_ns()));
 	contract.finalize_market(0, Some(0));
 
 

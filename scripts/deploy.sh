@@ -1,0 +1,1 @@
+near deploy --accountId flux-protocol-dispute-test --wasmFile ./res/flux_protocol.wasm

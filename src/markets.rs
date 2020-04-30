@@ -94,7 +94,7 @@ impl Markets {
 		let account_id = env::predecessor_account_id();
 
 		// TODO: Escrow bond account_id creator's account
-		let new_market = Market::new(self.nonce, account_id, description, extra_info, outcomes, outcome_tags, categories, end_time / 1000000, fee_percentage, cost_percentage, api_source);
+		let new_market = Market::new(self.nonce, account_id, description, extra_info, outcomes, outcome_tags, categories, end_time, fee_percentage, cost_percentage, api_source);
 		let market_id = new_market.id;
 		self.active_markets.insert(self.nonce, new_market);
 		self.nonce = self.nonce + 1;
@@ -465,16 +465,20 @@ mod tests {
 	}
 	
 	fn market_creation_timestamp() -> u64 {
-		return 1237800000;
+		return 12378;
 	}
-	fn market_end_timestamp() -> u64 {
-		return 1237900000000000;
+	fn market_end_timestamp_ns() -> u64 {
+		return 12379000000;
+	}
+	fn market_end_timestamp_ms() -> u64 {
+		return 12379;
 	}
 
 	fn get_context(
 		predecessor_account_id: String, 
 		block_timestamp: u64
 	) -> VMContext {
+		println!("bst {}", block_timestamp);
 		VMContext {
 			current_account_id: alice(),
             signer_account_id: bob(),

@@ -1,0 +1,1 @@
+near create_account flux-protocol-dispute-test --masterAccount flux-dev
