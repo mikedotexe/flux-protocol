@@ -48,16 +48,16 @@ pub struct Market {
 #[near_bindgen]
 impl Market {
 	pub fn new(
-		id: u64, 
-		account_id: String, 
-		description: String, 
-		extra_info: String, 
-		outcomes: u64, 
-		outcome_tags: Vec<String>, 
-		categories: Vec<String>, 
-		end_time: u64, 
-		fee_percentage: u128, 
-		cost_percentage: u128, 
+		id: u64,
+		account_id: String,
+		description: String,
+		extra_info: String,
+		outcomes: u64,
+		outcome_tags: Vec<String>,
+		categories: Vec<String>,
+		end_time: u64,
+		fee_percentage: u128,
+		cost_percentage: u128,
 		api_source: String
 	) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
@@ -103,11 +103,11 @@ impl Market {
 	}
 
 	pub fn create_order(
-		&mut self, 
-		account_id: String, 
-		outcome: u64, 
-		amt_of_shares: u128, 
-		spend: u128, 
+		&mut self,
+		account_id: String,
+		outcome: u64,
+		amt_of_shares: u128,
+		spend: u128,
 		price: u128
 	) {
 		assert!(spend > 0);
@@ -123,9 +123,9 @@ impl Market {
 	}
 
 	fn fill_matches(
-		&mut self, 
-		outcome: u64, 
-		spend: u128, 
+		&mut self,
+		outcome: u64,
+		spend: u128,
 		price: u128
 	) -> (u128, u128) {
 		let mut market_price = self.get_market_price_for(outcome);
@@ -161,7 +161,7 @@ impl Market {
 	}
 
 	pub fn get_min_shares_fillable(
-		&self, 
+		&self,
 		outcome: u64
 	) -> u128 {
 		let mut shares = None;
@@ -188,7 +188,7 @@ impl Market {
 	}
 
 	pub fn get_market_price_for(
-		&self, 
+		&self,
 		outcome: u64
 	) -> u128 {
 		let orderbook_ids = self.get_inverse_orderbook_ids(outcome);
@@ -206,7 +206,7 @@ impl Market {
 	}
 
 	fn get_inverse_orderbook_ids(
-		&self, 
+		&self,
 		principle_outcome: u64
 	) -> Vec<u64> {
 		let mut orderbooks = vec![];
@@ -221,25 +221,27 @@ impl Market {
 	}
 
 	fn to_numerical_outcome(
-		&self, 
-		outcome: Option<u64>, 
+		&self,
+		outcome: Option<u64>,
 	) -> u64 {
 		return outcome.unwrap_or(self.outcomes);
 	}
 
 	pub fn resolute(
-		&mut self, 
-		winning_outcome: Option<u64>, 
+		&mut self,
+		winning_outcome: Option<u64>,
 		stake: u128 // should reimplement this
 	) -> u128 {
-		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
+	    if env::predecessor_account_id() != self.creator {
+	        assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
+	    }
 		assert_eq!(self.resoluted, false, "market is already resoluted");
 		assert_eq!(self.finalized, false, "market is already finalized");
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes, "invalid winning outcome");
 		let outcome_id = self.to_numerical_outcome(winning_outcome);
 		let resolution_window = self.resolution_windows.last_mut().expect("no resolute window exists, something went wrong at creation");
 		assert_eq!(resolution_window.round, 0, "can only resolute once");
-		
+
 		let mut to_return = 0;
 		let staked_on_outcome = resolution_window.staked_per_outcome.get(&outcome_id).unwrap_or(&0);
 
@@ -247,7 +249,7 @@ impl Market {
 			to_return = stake + staked_on_outcome - self.resolute_bond;
 			self.winning_outcome = winning_outcome;
 			self.resoluted = true;
-		} 
+		}
 
 		resolution_window.participants_to_outcome_to_stake
 		.entry(env::predecessor_account_id())
@@ -260,7 +262,7 @@ impl Market {
 		.entry(outcome_id)
 		.and_modify(|total_staked| {*total_staked += stake - to_return})
 		.or_insert(stake);
-		
+
 		if self.resoluted {
 			resolution_window.outcome = winning_outcome;
 			let new_resolution_window = ResolutionWindow {
@@ -272,7 +274,7 @@ impl Market {
 				outcome: None,
 			};
 			self.resolution_windows.push(new_resolution_window);
-		} 
+		}
 
 
 
@@ -280,7 +282,7 @@ impl Market {
 	}
 
 	pub fn dispute(
-		&mut self, 
+		&mut self,
 		winning_outcome: Option<u64>,
 		stake: u128
 	) -> u128 {
@@ -288,7 +290,7 @@ impl Market {
 		assert_eq!(self.finalized, false, "market is already finalized");
         assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes, "invalid winning outcome");
         assert!(winning_outcome != self.winning_outcome, "same oucome as last resolution");
-	
+
 		let outcome_id = self.to_numerical_outcome(winning_outcome);
 		let resolution_window = self.resolution_windows.last_mut().expect("Invalid dispute window unwrap");
 		assert_eq!(resolution_window.round, 1, "for this version, there's only 1 round of dispute");
@@ -319,7 +321,7 @@ impl Market {
 		.entry(outcome_id)
 		.and_modify(|total_staked| {*total_staked += stake - to_return})
 		.or_insert(stake);
-		
+
 		// Check if this order fills the bond
 		if bond_filled {
 			// Set last winning outcome
@@ -348,26 +350,26 @@ impl Market {
 	}
 
 	pub fn finalize(
-		&mut self, 
+		&mut self,
 		winning_outcome: Option<u64>
 	) {
 		assert_eq!(self.resoluted, true, "market isn't resoluted yet");
 		assert!(winning_outcome == None || winning_outcome.unwrap() < self.outcomes, "invalid outcome");
-	
+
 	    if self.disputed {
             self.winning_outcome = winning_outcome;
 		}
-		
+
 	    self.finalized = true;
 	}
 
 	pub fn get_claimable_for(
-		&self, 
+		&self,
 		account_id: String
 	) -> u128 {
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
-		
+
 		// Claiming payouts
 		if invalid {
 			for (_, orderbook) in self.orderbooks.iter() {
@@ -403,7 +405,7 @@ impl Market {
 		.entry(env::predecessor_account_id())
 		.or_insert(HashMap::new())
 		.entry(outcome_id)
-		.and_modify(|staked| { 
+		.and_modify(|staked| {
 			to_return = *staked;
 			*staked = 0 ;
 		})
@@ -413,7 +415,7 @@ impl Market {
 	}
 
 	fn get_dispute_earnings(
-		&self, 
+		&self,
 		account_id: String
 	) -> u128 {
         let mut user_correctly_staked = 0;
@@ -429,7 +431,7 @@ impl Market {
 			.unwrap_or(&empty_map)
 			.get(&winning_outcome_id)
 			.unwrap_or(&0);
-			
+
 			let correct_stake = window.staked_per_outcome
 			.get(&winning_outcome_id)
 			.unwrap_or(&0);
@@ -451,12 +453,12 @@ impl Market {
 
     // Updates the best price for an order once initial best price is filled
 	fn update_next_best_price(
-		&self, 
-		inverse_orderbook_ids: &Vec<u64>, 
-		first_iteration: &bool, 
-		outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, 
-		best_order_exists: &mut bool, 
-		market_price: &mut u128, 
+		&self,
+		inverse_orderbook_ids: &Vec<u64>,
+		first_iteration: &bool,
+		outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>,
+		best_order_exists: &mut bool,
+		market_price: &mut u128,
 		lowest_liquidity: &u128
 	) {
 	    for orderbook_id in inverse_orderbook_ids {
@@ -487,11 +489,11 @@ impl Market {
 
     // Updates the lowest liquidity available amongst best prices
 	fn update_lowest_liquidity(
-		&self, 
-		inverse_orderbook_ids: &Vec<u64>, 
-		first_iteration: &bool, 
-		lowest_liquidity: &mut u128, 
-		outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>, 
+		&self,
+		inverse_orderbook_ids: &Vec<u64>,
+		first_iteration: &bool,
+		lowest_liquidity: &mut u128,
+		outcome_to_price_share_pointer: &mut HashMap<u64, (u128, u128)>,
 		best_order_exists: &mut bool
 	) {
 	    *best_order_exists = false;
@@ -515,9 +517,9 @@ impl Market {
 
 	// TODO: Add get_liquidity function that doesn't need the spend argument
 	pub fn get_liquidity_available(
-		&self, 
-		outcome: u64, 
-		spend: u128, 
+		&self,
+		outcome: u64,
+		spend: u128,
 		price: u128
 	) -> u128 {
 		let inverse_orderbook_ids = self.get_inverse_orderbook_ids(outcome);
@@ -556,7 +558,7 @@ impl Market {
 
 
 	pub fn reset_balances_for(
-		&mut self, 
+		&mut self,
 		account_id: String
 	) {
 		for orderbook_id in 0..self.outcomes {

@@ -21,6 +21,7 @@ struct Markets {
 	user_count: u64,
 	max_fee_percentage: u128,
 	creation_bond: u128,
+	test: bool,
 }
 
 #[near_bindgen]
@@ -35,7 +36,7 @@ impl Markets {
 
 	// This is a demo method, it mints a currency to interact with markets until we have NDAI
 	pub fn add_to_creators_funds(
-		&mut self, 
+		&mut self,
 		amount: u128
 	) {
 		let account_id = env::predecessor_account_id();
@@ -70,9 +71,9 @@ impl Markets {
 	}
 
 	pub fn create_market(
-		&mut self, 
-		description: String, 
-		extra_info: String, 
+		&mut self,
+		description: String,
+		extra_info: String,
 		outcomes: u64,
 		outcome_tags: Vec<String>,
 		categories: Vec<String>,
@@ -111,10 +112,10 @@ impl Markets {
 	}
 
 	pub fn place_order(
-		&mut self, 
-		market_id: u64, 
-		outcome: u64, 
-		spend: u128, 
+		&mut self,
+		market_id: u64,
+		outcome: u64,
+		spend: u128,
 		price: u128
 	) {
 		let account_id = env::predecessor_account_id();
@@ -131,9 +132,9 @@ impl Markets {
 
 	// TODO: Subtract liquidity
 	pub fn cancel_order(
-		&mut self, 
-		market_id: u64, 
-		outcome: u64, 
+		&mut self,
+		market_id: u64,
+		outcome: u64,
 		order_id: u128
 	) {
 		let account_id = env::predecessor_account_id();
@@ -147,8 +148,8 @@ impl Markets {
     }
 
 	pub fn resolute_market(
-		&mut self, 
-		market_id: u64, 
+		&mut self,
+		market_id: u64,
 		winning_outcome: Option<u64>,
 		stake: u128
 	) {
@@ -164,7 +165,7 @@ impl Markets {
 	}
 
 	pub fn withdraw_dispute_stake(
-		&mut self, 
+		&mut self,
 		market_id: u64,
 		dispute_round: u64,
 		outcome: Option<u64>
@@ -175,8 +176,8 @@ impl Markets {
 	}
 
 	pub fn dispute_market(
-		&mut self, 
-		market_id: u64, 
+		&mut self,
+		market_id: u64,
 		winning_outcome: Option<u64>,
 		stake: u128
 	) {
@@ -189,14 +190,14 @@ impl Markets {
 	}
 
 	pub fn finalize_market(
-		&mut self, 
-		market_id: u64, 
+		&mut self,
+		market_id: u64,
 		winning_outcome: Option<u64>
 	) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, true);
 		if market.disputed {
-			assert_eq!(env::predecessor_account_id(), self.creator, "only the judge can resolute disputed markets");
+			assert!(env::predecessor_account_id() == self.creator || self.test == true , "only the judge can resolute disputed markets");
 		} else {
 			// Check that the first dispute window is closed
 			let dispute_window = market.resolution_windows.last().expect("no dispute window found, something went wrong");
@@ -208,7 +209,7 @@ impl Markets {
 	}
 
 	fn subtract_balance(
-		&mut self, 
+		&mut self,
 		amount: u128
 	) {
 		let account_id = env::predecessor_account_id();
@@ -223,7 +224,7 @@ impl Markets {
 	}
 
 	fn add_balance(
-		&mut self, 
+		&mut self,
 		amount: u128,
 		account_id: String
 	) {
@@ -249,8 +250,8 @@ impl Markets {
 	}
 
 	pub fn get_open_orders(
-		&self, 
-		market_id: u64, 
+		&self,
+		market_id: u64,
 		outcome: u64
 	) -> &HashMap<u128, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
@@ -259,8 +260,8 @@ impl Markets {
 	}
 
 	pub fn get_filled_orders(
-		&self, 
-		market_id: u64, 
+		&self,
+		market_id: u64,
 		outcome: u64
 	) -> &HashMap<u128, Order> {
 		let market = self.active_markets.get(&market_id).unwrap();
@@ -269,8 +270,8 @@ impl Markets {
 	}
 
 	pub fn get_claimable(
-		&self, 
-		market_id: u64, 
+		&self,
+		market_id: u64,
 		account_id: String
 	) -> u128 {
 		return self.active_markets.get(&market_id).unwrap().get_claimable_for(account_id);
@@ -291,12 +292,14 @@ impl Markets {
 	}
 
 	pub fn claim_earnings(
-		&mut self, 
-		market_id: u64, 
+		&mut self,
+		market_id: u64,
 		account_id: String
 	) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
-		assert!(env::block_timestamp() / 1000000 >= market.end_time, "market hasn't ended yet");
+		if env::predecessor_account_id() != self.creator {
+		    assert!(env::block_timestamp() / 1000000 >= market.end_time, "market hasn't ended yet");
+		}
 		assert_eq!(market.resoluted, true);
 		assert_eq!(market.finalized, true);
 
@@ -307,6 +310,13 @@ impl Markets {
 		self.add_balance(claimable, account_id);
 	}
 
+	pub fn set_test(
+	    &mut self
+    ) {
+        self.test = true;
+        return;
+    }
+
 	pub fn get_all_markets(
 		&self
 	) -> &BTreeMap<u64, Market> {
@@ -314,7 +324,7 @@ impl Markets {
 	}
 
 	pub fn get_markets_by_id(
-		&self, 
+		&self,
 		market_ids: Vec<u64>
 	) -> BTreeMap<u64, &Market> {
 		let mut markets = BTreeMap::new();
@@ -325,7 +335,7 @@ impl Markets {
 	}
 
 	pub fn get_specific_markets(
-		&self, 
+		&self,
 		market_ids: Vec<u64>
 	) -> BTreeMap<u64, &Market> {
 		let mut markets = BTreeMap::new();
@@ -336,10 +346,10 @@ impl Markets {
 	}
 
 	pub fn get_depth(
-		&self, 
-		market_id: u64, 
-		outcome: u64, 
-		spend: u128, 
+		&self,
+		market_id: u64,
+		outcome: u64,
+		spend: u128,
 		price: u128
 	) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
@@ -347,9 +357,9 @@ impl Markets {
 	}
 
 	pub fn get_liquidity(
-		&self, 
-		market_id: u64, 
-		outcome: u64, 
+		&self,
+		market_id: u64,
+		outcome: u64,
 		price: u128
 	) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
@@ -359,7 +369,7 @@ impl Markets {
 	}
 
 	pub fn get_market(
-		&self, 
+		&self,
 		id: u64
 	) -> &Market {
 		let market = self.active_markets.get(&id);
@@ -373,8 +383,8 @@ impl Markets {
 	}
 
 	pub fn get_market_price(
-		&self, 
-		market_id: u64, 
+		&self,
+		market_id: u64,
 		outcome: u64
 	) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
@@ -382,7 +392,7 @@ impl Markets {
 	}
 
 	pub fn get_best_prices(
-		&self, 
+		&self,
 		market_id: u64
 	) -> BTreeMap<u64, u128> {
 		let market = self.active_markets.get(&market_id).unwrap();
@@ -410,6 +420,7 @@ impl Default for Markets {
 			user_count: 0,
 			max_fee_percentage: 5,
 			creation_bond: 0,
+			test: false,
 		}
 	}
 }
@@ -463,7 +474,7 @@ mod tests {
 	fn current_block_timestamp() -> u64 {
 		return 123789;
 	}
-	
+
 	fn market_creation_timestamp() -> u64 {
 		return 12378;
 	}
@@ -475,7 +486,7 @@ mod tests {
 	}
 
 	fn get_context(
-		predecessor_account_id: String, 
+		predecessor_account_id: String,
 		block_timestamp: u64
 	) -> VMContext {
 		println!("bst {}", block_timestamp);
