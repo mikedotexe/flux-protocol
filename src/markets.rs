@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 mod market;
 type Market = market::Market;
 type Order = market::orderbook::order::Order;
+type ResolutionWindow = market::ResolutionWindow;
 
 #[near_bindgen]
 #[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Debug)]
@@ -37,10 +38,10 @@ impl Markets {
 		&mut self, 
 		amount: u128
 	) {
-		let from = env::predecessor_account_id();
-		assert_eq!(from, self.creator);
+		let account_id = env::predecessor_account_id();
+		assert_eq!(account_id, self.creator);
 
-		*self.fdai_balances.get_mut(&from).unwrap() += amount;
+		*self.fdai_balances.get_mut(&account_id).unwrap() += amount;
 
 		// Monitoring total supply - just for testnet
 		self.fdai_circulation = self.fdai_circulation + amount as u128;
@@ -51,12 +52,12 @@ impl Markets {
 	pub fn claim_fdai(
 		&mut self
 	) {
-		let from = env::predecessor_account_id();
-		let can_claim = self.fdai_balances.get(&from).is_none();
+		let account_id = env::predecessor_account_id();
+		let can_claim = self.fdai_balances.get(&account_id).is_none();
 		assert!(can_claim, "user has already claimed fdai");
 
 		let claim_amount = 100 * self.dai_token();
-		self.fdai_balances.insert(from, claim_amount);
+		self.fdai_balances.insert(account_id, claim_amount);
 
 		// Monitoring total supply - just for testnet
 		self.fdai_circulation = self.fdai_circulation + claim_amount as u128;
@@ -64,8 +65,8 @@ impl Markets {
 		self.user_count = self.user_count + 1;
 	}
 
-	pub fn get_fdai_balance(&self, from: String) -> u128 {
-		return *self.fdai_balances.get(&from).unwrap();
+	pub fn get_fdai_balance(&self, account_id: String) -> u128 {
+		return *self.fdai_balances.get(&account_id).unwrap_or(&0);
 	}
 
 	pub fn create_market(
@@ -90,10 +91,10 @@ impl Markets {
 
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
 		// TODO check if end_time hasn't happened yet
-		let from = env::predecessor_account_id();
+		let account_id = env::predecessor_account_id();
 
-		// TODO: Escrow bond from creator's account
-		let new_market = Market::new(self.nonce, from, description, extra_info, outcomes, outcome_tags, categories, end_time, fee_percentage, cost_percentage, api_source);
+		// TODO: Escrow bond account_id creator's account
+		let new_market = Market::new(self.nonce, account_id, description, extra_info, outcomes, outcome_tags, categories, end_time, fee_percentage, cost_percentage, api_source);
 		let market_id = new_market.id;
 		self.active_markets.insert(self.nonce, new_market);
 		self.nonce = self.nonce + 1;
@@ -104,8 +105,8 @@ impl Markets {
 		&mut self,
 		market_id: u64
 	) {
-		let from = env::predecessor_account_id();
-		assert_eq!(from, self.creator, "markets can only be deleted by the market creator");
+		let account_id = env::predecessor_account_id();
+		assert_eq!(account_id, self.creator, "markets can only be deleted by the market creator");
 		self.active_markets.remove(&market_id);
 	}
 
@@ -116,63 +117,75 @@ impl Markets {
 		spend: u128, 
 		price: u128
 	) {
-		let from = env::predecessor_account_id();
-		let balance = self.fdai_balances.get(&from).unwrap();
-		assert!(balance >= &spend);
+		let account_id = env::predecessor_account_id();
+		let balance = self.get_fdai_balance(account_id.to_string());
+		assert!(balance >= spend, "insufficient balance");
 
 		let amount_of_shares = spend / price;
 		let rounded_spend = amount_of_shares * price;
 		let market = self.active_markets.get_mut(&market_id).unwrap();
-		market.place_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price);
+		market.create_order(account_id.to_string(), outcome, amount_of_shares, rounded_spend, price);
 
 		self.subtract_balance(rounded_spend);
 	}
 
+	// TODO: Subtract liquidity
 	pub fn cancel_order(
 		&mut self, 
 		market_id: u64, 
 		outcome: u64, 
 		order_id: u128
 	) {
-		let from = env::predecessor_account_id();
+		let account_id = env::predecessor_account_id();
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, false);
 		let mut orderbook = market.orderbooks.get_mut(&outcome).unwrap();
 		let order = orderbook.open_orders.get(&order_id).unwrap();
-		assert!(from == order.creator);
-		orderbook.remove_order(order_id);
+		assert!(account_id == order.creator);
+		let to_return = orderbook.remove_order(order_id);
+		self.add_balance(to_return, account_id);
     }
 
-	pub fn resolute(
+	pub fn resolute_market(
 		&mut self, 
 		market_id: u64, 
-		winning_outcome: Option<u64>
+		winning_outcome: Option<u64>,
+		stake: u128
 	) {
-		let from = env::predecessor_account_id();
-		let market = self.active_markets.get_mut(&market_id).unwrap();
+		let account_id = env::predecessor_account_id();
+		let balance = self.get_fdai_balance(account_id.to_string());
+        assert!(balance >= stake, "not enough balance to cover stake");
+		let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
 		assert_eq!(market.resoluted, false);
 
-		let bond = market.resolute_bond;
-		let balance = self.fdai_balances.get(&from).unwrap();
-        assert!(balance >= &bond);
 
-		market.resolute(from, winning_outcome, bond);
-		self.subtract_balance(bond);
+		let change = market.resolute(winning_outcome, stake);
+		self.subtract_balance(stake - change);
 	}
 
-	pub fn dispute(
+	pub fn withdraw_dispute_stake(
+		&mut self, 
+		market_id: u64,
+		dispute_round: u64,
+		outcome: Option<u64>
+	) {
+		let market = self.active_markets.get_mut(&market_id).expect("invalid market");
+		let to_return = market.cancel_dispute_participation(dispute_round, outcome);
+		self.add_balance(to_return, env::predecessor_account_id());
+	}
+
+	pub fn dispute_market(
 		&mut self, 
 		market_id: u64, 
-		winning_outcome: Option<u64>, 
-		bond: u128
+		winning_outcome: Option<u64>,
+		stake: u128
 	) {
-	    let from = env::predecessor_account_id();
-        let market = self.active_markets.get_mut(&market_id).unwrap();
-        assert_eq!(market.resoluted, true);
-        assert_eq!(market.disputed, false);
-
-        let return_amount = market.dispute(from, winning_outcome, bond);
-        self.subtract_balance(bond-return_amount);
+	    let account_id = env::predecessor_account_id();
+        let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
+		let balance = self.fdai_balances.get(&account_id).unwrap_or(&0);
+		assert!(balance >= &stake, "not enough balance to cover stake");
+		let change = market.dispute(winning_outcome, stake);
+        self.subtract_balance(stake - change);
 	}
 
 	pub fn finalize_market(
@@ -183,19 +196,26 @@ impl Markets {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, true);
 		if market.disputed {
-			assert_eq!(env::predecessor_account_id(), self.creator);
+			assert_eq!(env::predecessor_account_id(), self.creator, "only the judge can resolute disputed markets");
+		} else {
+			// Check that the first dispute window is closed
+			let dispute_window = market.resolution_windows.last().expect("no dispute window found, something went wrong");
+			println!("{} {}", env::block_timestamp() / 1000000, dispute_window.end_time);
+			assert!(env::block_timestamp() / 1000000 >= dispute_window.end_time || dispute_window.round == 2, "dispute window still open")
 		}
-        market.finalize(env::predecessor_account_id(), winning_outcome);
+
+        market.finalize(winning_outcome);
 	}
 
 	fn subtract_balance(
 		&mut self, 
 		amount: u128
 	) {
-		let from = env::predecessor_account_id();
-		let balance = self.fdai_balances.get(&from).unwrap();
+		let account_id = env::predecessor_account_id();
+		let balance = self.fdai_balances.get(&account_id).unwrap();
+		assert!(*balance >= amount, "sender has unsufficient balance");
 		let new_balance = *balance - amount;
-		self.fdai_balances.insert(from, new_balance);
+		self.fdai_balances.insert(account_id, new_balance);
 
 		// For monitoring supply - just for testnet
 		self.fdai_outside_escrow = self.fdai_outside_escrow - amount as u128;
@@ -204,16 +224,28 @@ impl Markets {
 
 	fn add_balance(
 		&mut self, 
-		amount: u128
+		amount: u128,
+		account_id: String
 	) {
-		let from = env::predecessor_account_id();
-		let balance = self.fdai_balances.get(&from).unwrap();
+		let balance = self.fdai_balances.get(&account_id).unwrap();
 		let new_balance = *balance + amount;
-		self.fdai_balances.insert(from, new_balance);
+		self.fdai_balances.insert(account_id, new_balance);
 
 		// For monitoring supply - just for testnet
 		self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
 		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
+	}
+
+	pub fn get_active_resolution_window(
+		&self,
+		market_id: u64
+	) -> Option<&ResolutionWindow> {
+		let market = self.active_markets.get(&market_id).expect("market doesn't exist");
+		if !market.resoluted {
+			return None;
+		}
+		return Some(market.resolution_windows.last().expect("invalid dispute window"));
+
 	}
 
 	pub fn get_open_orders(
@@ -239,9 +271,23 @@ impl Markets {
 	pub fn get_claimable(
 		&self, 
 		market_id: u64, 
-		from: String
+		account_id: String
 	) -> u128 {
-		return self.active_markets.get(&market_id).unwrap().get_claimable(from);
+		return self.active_markets.get(&market_id).unwrap().get_claimable_for(account_id);
+	}
+
+	pub fn claim_creator_fee(
+		&mut self,
+		market_id: u64
+	) {
+		let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
+		let creator = market.creator.to_string();
+		assert_eq!(market.fee_claimed, false, "creator already claimed fees");
+		assert_eq!(env::predecessor_account_id(), creator.to_string(), "only creator himself can claim the fees");
+		// TODO: liquidity, as it is now is not the right metric, filled volume would be
+		let fee_payout = market.liquidity * market.fee_percentage / 100;
+		market.fee_claimed = true;
+		self.add_balance(fee_payout, creator.to_string());
 	}
 
 	pub fn claim_earnings(
@@ -250,15 +296,15 @@ impl Markets {
 		account_id: String
 	) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
-		assert!(env::block_timestamp() >= market.end_time, "market hasn't ended yet");
+		assert!(env::block_timestamp() / 1000000 >= market.end_time, "market hasn't ended yet");
 		assert_eq!(market.resoluted, true);
 		assert_eq!(market.finalized, true);
 
-		let claimable = market.get_claimable(account_id.to_string());
-		market.delete_orders_for(account_id.to_string());
+		let claimable = market.get_claimable_for(account_id.to_string());
+		market.reset_balances_for(account_id.to_string());
 		market.delete_resolution_for(account_id.to_string());
 
-		self.add_balance(claimable);
+		self.add_balance(claimable, account_id);
 	}
 
 	pub fn get_all_markets(
@@ -332,7 +378,7 @@ impl Markets {
 		outcome: u64
 	) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
-		return market.get_market_price(outcome);
+		return market.get_market_price_for(outcome);
 	}
 
 	pub fn get_best_prices(
@@ -340,7 +386,7 @@ impl Markets {
 		market_id: u64
 	) -> BTreeMap<u64, u128> {
 		let market = self.active_markets.get(&market_id).unwrap();
-		return market.get_market_prices();
+		return market.get_market_prices_for();
 	}
 
 	pub fn get_fdai_metrics(
@@ -373,7 +419,16 @@ impl Default for Markets {
 mod tests {
     use super::*;
     use near_sdk::MockedBlockchain;
-    use near_sdk::{VMContext, VMConfig, testing_env};
+    use near_sdk::{VMContext, testing_env};
+
+	fn to_dai(amt: u128) -> u128 {
+		let base = 10 as u128;
+		return amt * base.pow(17);
+	}
+
+	fn judge() -> String {
+		return "flux-dev".to_string();
+	}
 
 	fn alice() -> String {
 		return "alice.near".to_string();
@@ -412,14 +467,18 @@ mod tests {
 	fn market_creation_timestamp() -> u64 {
 		return 12378;
 	}
-	fn market_end_timestamp() -> u64 {
+	fn market_end_timestamp_ns() -> u64 {
 		return 12379000000;
+	}
+	fn market_end_timestamp_ms() -> u64 {
+		return 12379;
 	}
 
 	fn get_context(
 		predecessor_account_id: String, 
 		block_timestamp: u64
 	) -> VMContext {
+		println!("bst {}", block_timestamp);
 		VMContext {
 			current_account_id: alice(),
             signer_account_id: bob(),
@@ -444,8 +503,8 @@ mod tests {
 	mod market_order_tests;
 	mod binary_order_matching_tests;
 	mod categorical_market_tests;
-	mod market_resolution_tests;
-	mod claim_earnings_tests;
 	mod market_depth_tests;
+	mod claim_earnings_tests;
 	mod market_dispute_tests;
+	mod market_resolution_tests;
 }

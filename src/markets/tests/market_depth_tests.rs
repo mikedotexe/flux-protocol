@@ -5,7 +5,7 @@ fn test_liquidity_for_price() {
 	testing_env!(get_context(carol(), current_block_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), market_end_timestamp(), 0, 0, "test".to_string());
+	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), market_end_timestamp_ms(), 0, 0, "test".to_string());
 
 	contract.place_order(0, 0, 6000, 50);
 	contract.place_order(0, 0, 6000, 50); 
@@ -44,7 +44,7 @@ fn test_valid_binary_market_depth() {
 	testing_env!(get_context(carol(), current_block_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(), market_end_timestamp(), 0, 0, "test.com".to_string());
+	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(), market_end_timestamp_ms(), 0, 0, "test.com".to_string());
 
 	contract.place_order(0, 0, 5000, 50);
 	contract.place_order(0, 0, 6000, 60);

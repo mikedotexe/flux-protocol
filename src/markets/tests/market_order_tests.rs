@@ -5,7 +5,7 @@ fn test_market_orders() {
 	testing_env!(get_context(carol(), current_block_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), market_end_timestamp(), 0, 0, "test".to_string());
+	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), market_end_timestamp_ms(), 0, 0, "test".to_string());
 
 	// simplest binary fill scenario
 	contract.place_order(0, 1, 5000, 50); // 0
