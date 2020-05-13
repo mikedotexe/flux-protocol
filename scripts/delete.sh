@@ -1,1 +1,1 @@
-near delete flux-protocol-dispute-test flux-dev
+near delete fluxprotocol-phase-point-two flux-dev

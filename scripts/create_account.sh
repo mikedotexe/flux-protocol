@@ -1,1 +1,1 @@
-near create_account flux-protocol-dispute-test --masterAccount flux-dev
+near create_account fluxprotocol-phase-point-two --masterAccount flux-dev

@@ -200,7 +200,6 @@ impl Markets {
 		} else {
 			// Check that the first dispute window is closed
 			let dispute_window = market.resolution_windows.last().expect("no dispute window found, something went wrong");
-			println!("{} {}", env::block_timestamp() / 1000000, dispute_window.end_time);
 			assert!(env::block_timestamp() / 1000000 >= dispute_window.end_time || dispute_window.round == 2, "dispute window still open")
 		}
 
@@ -478,7 +477,7 @@ mod tests {
 		predecessor_account_id: String, 
 		block_timestamp: u64
 	) -> VMContext {
-		println!("bst {}", block_timestamp);
+
 		VMContext {
 			current_account_id: alice(),
             signer_account_id: bob(),

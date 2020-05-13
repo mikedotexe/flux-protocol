@@ -1,1 +1,1 @@
-near deploy --accountId flux-protocol-dispute-test --wasmFile ./res/flux_protocol.wasm
+near deploy --accountId fluxprotocol-phase-point-two --wasmFile ./res/flux_protocol.wasm
