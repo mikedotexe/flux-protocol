@@ -1,4 +1,4 @@
-use near_bindgen::{near_bindgen, env};
+use near_bindgen::{near_bindgen, env, ext_contract, Promise, PromiseOrValue};
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::collections::{BTreeMap, HashMap};
 use serde::{Deserialize, Serialize};
@@ -20,8 +20,41 @@ struct Markets {
 	user_count: u64
 }
 
+// Prepaid gas for making a single simple call.
+const SINGLE_CALL_GAS: u64 = 200000000000000;
+
+struct TransferFromArgs {
+    owner_id: String,
+    new_owner_id: String,
+    amount: String
+}
+
+struct TransferArgs {
+    new_owner_id: String,
+    amount: String,
+}
+
+// If the name is not provided, the namespace for generated methods in derived by applying snake
+// case to the trait name, e.g. ext_fungible_token
+#[ext_contract]
+pub trait ExtFungibleToken {
+    pub fn transfer_from(&mut self, owner_id: String, new_owner_id: String, amount: u128);
+    pub fn transfer(&mut self, new_owner_id: String, amount: u128);
+    pub fn get_total_supply(&self) -> u128;
+    pub fn get_balance(&self, owner_id: AccountId) -> u128;
+}
+
 #[near_bindgen]
 impl Markets {
+    pub fn deploy_fungible_token_contract(&self, from: String, amount: u64) {
+        Promise::new(from)
+            .create_account()
+            .transfer(amount as u128)
+            .add_full_access_key(env::signer_account_pk())
+            .deploy_contract(
+                include_bytes!("../res/fungible_token.wasm").to_vec(),
+            );
+    }
 
 	fn dai_token(&self) -> u128 {
 		let base: u128 = 10;
@@ -29,25 +62,33 @@ impl Markets {
 	}
 
 	// This is a demo method, it mints a currency to interact with markets until we have NDAI
-	pub fn add_to_creators_funds(&mut self, amount: u128) {
-		let from = env::predecessor_account_id();
-		assert_eq!(from, self.creator);
+	//pub fn add_to_creators_funds(&mut self, amount: u128) {
+	//	let from = env::predecessor_account_id();
+	//	assert_eq!(from, self.creator);
 
-		*self.fdai_balances.get_mut(&from).unwrap() += amount;
+	//	*self.fdai_balances.get_mut(&from).unwrap() += amount;
 
 		// Monitoring total supply - just for testnet
-		self.fdai_circulation = self.fdai_circulation + amount as u128;
-		self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
-	}
+	//	self.fdai_circulation = self.fdai_circulation + amount as u128;
+	//	self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
+	//}
 
 	// This is a demo method, it mints a currency to interact with markets until we have NDAI
 	pub fn claim_fdai(&mut self) {
 		let from = env::predecessor_account_id();
-		let can_claim = self.fdai_balances.get(&from).is_none();
+		let can_claim = ext_fungible_token::get_balance(from, &from, 0, SINGLE_CALL_GAS).is_none();
+		//let can_claim = self.fdai_balances.get(&from).is_none();
 		assert!(can_claim, "user has already claimed fdai");
 
 		let claim_amount = 100 * self.dai_token();
-		self.fdai_balances.insert(from, claim_amount);
+		let transfer_from_args = TransferFromArgs {
+		        owner_id: self.creator,
+		        new_owner_id: from,
+		        amount: claim_amount.to_string(),
+            };
+
+		ext_fungible_token::transfer_from(transfer_from_args, &self.creator, 0, SINGLE_CALL_GAS);
+		//self.fdai_balances.insert(from, claim_amount);
 
 		// Monitoring total supply - just for testnet
 		self.fdai_circulation = self.fdai_circulation + claim_amount as u128;
@@ -55,8 +96,10 @@ impl Markets {
 		self.user_count = self.user_count + 1;
 	}
 
-	pub fn get_fdai_balance(&self, from: String) -> u128 {
-		return *self.fdai_balances.get(&from).unwrap();
+	pub fn get_fdai_balance(&self, from: String) -> () {
+	    let promise = ext_fungible_token::get_balance(from, &from, 0, SINGLE_CALL_GAS);
+	    env::promise_return(promise);
+		//return *self.fdai_balances.get(&from).unwrap();
 	}
 
 	pub fn create_market(&mut self, description: String, extra_info: String, outcomes: u64, outcome_tags: Vec<String>, categories: Vec<String>, end_time: u64) -> u64 {
@@ -113,9 +156,14 @@ impl Markets {
 
 	fn subtract_balance(&mut self, amount: u128) {
 		let from = env::predecessor_account_id();
-		let balance = self.fdai_balances.get(&from).unwrap();
-		let new_balance = *balance - amount;
-		self.fdai_balances.insert(from, new_balance);
+		let transfer_args = TransferArgs {
+		        new_owner_id: self.creator,
+		        amount: amount.to_string(),
+		    };
+		ext_fungible_token::transfer(transfer_args, &from, 0, SINGLE_CALL_GAS);
+		//let balance = self.fdai_balances.get(&from).unwrap();
+		//let new_balance = *balance - amount;
+		//self.fdai_balances.insert(from, new_balance);
 
 		// For monitoring supply - just for testnet
 		self.fdai_outside_escrow = self.fdai_outside_escrow - amount as u128;
@@ -123,10 +171,18 @@ impl Markets {
 	}
 
 	fn add_balance(&mut self, amount: u128) {
-		let from = env::predecessor_account_id();
-		let balance = self.fdai_balances.get(&from).unwrap();
-		let new_balance = *balance + amount;
-		self.fdai_balances.insert(from, new_balance);
+	    let from = env::predecessor_account_id();
+	    let transfer_from_args = TransferFromArgs {
+                owner_id: self.creator,
+                new_owner_id: from,
+                amount: amount.to_string(),
+            };
+        ext_fungible_token::transfer_from(transfer_from_args, &self.creator, 0, SINGLE_CALL_GAS);
+
+		//let from = env::predecessor_account_id();
+		//let balance = self.fdai_balances.get(&from).unwrap();
+		//let new_balance = *balance + amount;
+		//self.fdai_balances.insert(from, new_balance);
 
 		// For monitoring supply - just for testnet
 		self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
