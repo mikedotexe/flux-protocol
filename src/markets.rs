@@ -23,30 +23,19 @@ struct Markets {
 // Prepaid gas for making a single simple call.
 const SINGLE_CALL_GAS: u64 = 200000000000000;
 
-struct TransferFromArgs {
-    owner_id: String,
-    new_owner_id: String,
-    amount: String
-}
-
-struct TransferArgs {
-    new_owner_id: String,
-    amount: String,
-}
-
 // If the name is not provided, the namespace for generated methods in derived by applying snake
 // case to the trait name, e.g. ext_fungible_token
 #[ext_contract]
 pub trait ExtFungibleToken {
-    pub fn transfer_from(&mut self, owner_id: String, new_owner_id: String, amount: u128);
-    pub fn transfer(&mut self, new_owner_id: String, amount: u128);
-    pub fn get_total_supply(&self) -> u128;
-    pub fn get_balance(&self, owner_id: AccountId) -> u128;
+    fn transfer_from(&mut self, owner_id: String, new_owner_id: String, amount: u128);
+    fn transfer(&mut self, new_owner_id: String, amount: u128);
+    fn get_total_supply(&self) -> u128;
+    fn get_balance(&self, owner_id: AccountId) -> u128;
 }
 
 #[near_bindgen]
 impl Markets {
-    pub fn deploy_fungible_token_contract(&self, from: String, amount: u64) {
+    pub fn deploy_fungible_token(&self, from: String, amount: u64) {
         Promise::new(from)
             .create_account()
             .transfer(amount as u128)
@@ -81,13 +70,7 @@ impl Markets {
 		assert!(can_claim, "user has already claimed fdai");
 
 		let claim_amount = 100 * self.dai_token();
-		let transfer_from_args = TransferFromArgs {
-		        owner_id: self.creator,
-		        new_owner_id: from,
-		        amount: claim_amount.to_string(),
-            };
-
-		ext_fungible_token::transfer_from(transfer_from_args, &self.creator, 0, SINGLE_CALL_GAS);
+		ext_fungible_token::transfer_from(self.creator, from, claim_amount, &self.creator, 0, SINGLE_CALL_GAS);
 		//self.fdai_balances.insert(from, claim_amount);
 
 		// Monitoring total supply - just for testnet
@@ -96,7 +79,7 @@ impl Markets {
 		self.user_count = self.user_count + 1;
 	}
 
-	pub fn get_fdai_balance(&self, from: String) -> () {
+	pub fn get_fdai_balance(&self, from: String) -> u128 {
 	    let promise = ext_fungible_token::get_balance(from, &from, 0, SINGLE_CALL_GAS);
 	    env::promise_return(promise);
 		//return *self.fdai_balances.get(&from).unwrap();
@@ -156,11 +139,7 @@ impl Markets {
 
 	fn subtract_balance(&mut self, amount: u128) {
 		let from = env::predecessor_account_id();
-		let transfer_args = TransferArgs {
-		        new_owner_id: self.creator,
-		        amount: amount.to_string(),
-		    };
-		ext_fungible_token::transfer(transfer_args, &from, 0, SINGLE_CALL_GAS);
+		ext_fungible_token::transfer(self.creator, amount, &from, 0, SINGLE_CALL_GAS);
 		//let balance = self.fdai_balances.get(&from).unwrap();
 		//let new_balance = *balance - amount;
 		//self.fdai_balances.insert(from, new_balance);
@@ -172,12 +151,7 @@ impl Markets {
 
 	fn add_balance(&mut self, amount: u128) {
 	    let from = env::predecessor_account_id();
-	    let transfer_from_args = TransferFromArgs {
-                owner_id: self.creator,
-                new_owner_id: from,
-                amount: amount.to_string(),
-            };
-        ext_fungible_token::transfer_from(transfer_from_args, &self.creator, 0, SINGLE_CALL_GAS);
+        ext_fungible_token::transfer_from(self.creator, from, amount, &self.creator, 0, SINGLE_CALL_GAS);
 
 		//let from = env::predecessor_account_id();
 		//let balance = self.fdai_balances.get(&from).unwrap();
@@ -349,5 +323,5 @@ mod tests {
 	mod categorical_market_tests;
 	mod market_resolution_tests;
 	mod claim_earnings_tests;
-	mod market_depth_tests;
+	//mod market_depth_tests;
 }
