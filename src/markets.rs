@@ -33,6 +33,13 @@ pub trait ExtFungibleToken {
     fn get_balance(&self, owner_id: AccountId) -> u128;
 }
 
+#[ext_contract(ext)]
+pub trait ExtContract {
+    fn check_not_claimed(&mut self);
+    fn grant_fdai(&mut self);
+    fn check_sufficient_balance(&mut self, spend: u128);
+}
+
 #[near_bindgen]
 impl Markets {
     pub fn deploy_fungible_token(&self, from: String, amount: u64) {
@@ -65,23 +72,48 @@ impl Markets {
 	// This is a demo method, it mints a currency to interact with markets until we have NDAI
 	pub fn claim_fdai(&mut self) {
 		let from = env::predecessor_account_id();
-		let can_claim = ext_fungible_token::get_balance(from, &from, 0, SINGLE_CALL_GAS).is_none();
+		ext_fungible_token::get_balance(from, &from, 0, SINGLE_CALL_GAS).then(
+		    env::check_not_claimed(&env::current_account_id(), 0, SINGLE_CALL_GAS);
+        ).then(
+		    env::grant_fdai(&env::current_account_id(), 0, SINGLE_CALL_GAS);
+		).then(
+		    let claim_amount = 100 * self.dai_token();
+		    self.fdai_circulation = self.fdai_circulation + claim_amount as u128;
+            self.fdai_outside_escrow = self.fdai_outside_escrow + claim_amount as u128;
+            self.user_count = self.user_count + 1;
+		);
 		//let can_claim = self.fdai_balances.get(&from).is_none();
-		assert!(can_claim, "user has already claimed fdai");
+		//assert!(can_claim, "user has already claimed fdai");
 
-		let claim_amount = 100 * self.dai_token();
-		ext_fungible_token::transfer_from(self.creator, from, claim_amount, &self.creator, 0, SINGLE_CALL_GAS);
+		//let claim_amount = 100 * self.dai_token();
+		//ext_fungible_token::transfer_from(self.creator, from, claim_amount, &self.creator, 0, SINGLE_CALL_GAS);
 		//self.fdai_balances.insert(from, claim_amount);
 
 		// Monitoring total supply - just for testnet
-		self.fdai_circulation = self.fdai_circulation + claim_amount as u128;
-		self.fdai_outside_escrow = self.fdai_outside_escrow + claim_amount as u128;
-		self.user_count = self.user_count + 1;
+		//self.fdai_circulation = self.fdai_circulation + claim_amount as u128;
+		//self.fdai_outside_escrow = self.fdai_outside_escrow + claim_amount as u128;
+		//self.user_count = self.user_count + 1;
 	}
 
+	#[callback_args(amount)]
+    pub fn check_not_claimed(&mut self, amount: u128) -> Result<bool, String> {
+        if amount != 0 {
+            return Ok(amount != 0);
+        } else {
+            return Err("user has already claimed fdai".to_string());
+        }
+    }
+
+    #[callback_args(check_result)]
+    pub fn grant_fdai(&mut self, check_result: Result<bool, String>) {
+        if let Ok(true) = check_result {
+            let claim_amount = 100 * self.dai_token();
+            ext_fungible_token::transfer_from(self.creator, from, claim_amount, &self.creator, 0, SINGLE_CALL_GAS);
+        }
+    }
+
 	pub fn get_fdai_balance(&self, from: String) -> u128 {
-	    let promise = ext_fungible_token::get_balance(from, &from, 0, SINGLE_CALL_GAS);
-	    env::promise_return(promise);
+	    ext_fungible_token::get_balance(from, &from, 0, SINGLE_CALL_GAS).as_return();
 		//return *self.fdai_balances.get(&from).unwrap();
 	}
 
@@ -111,15 +143,27 @@ impl Markets {
 	pub fn place_order(&mut self, market_id: u64, outcome: u64, spend: u128, price: u128) {
 		let from = env::predecessor_account_id();
 		let balance = self.fdai_balances.get(&from).unwrap();
-		assert!(balance >= &spend);
 
-		let amount_of_shares = spend / price;
-		let rounded_spend = amount_of_shares * price;
-		let market = self.active_markets.get_mut(&market_id).unwrap();
-		market.place_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price);
+        ext_fungible_token::get_balance(from, &from, 0, SINGLE_CALL_GAS).then(
+            env::check_sufficient_balance(spend, &env::current_account_id(), 0, SINGLE_CALL_GAS);
+        ).then(
+            let amount_of_shares = spend / price;
+            let rounded_spend = amount_of_shares * price;
+            let market = self.active_markets.get_mut(&market_id).unwrap();
+            market.place_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price);
 
-		self.subtract_balance(rounded_spend);
+            self.subtract_balance(rounded_spend);
+        );
 	}
+
+    #[callback_args(amount)]
+    pub fn check_sufficient_balance(&mut self, spend: u128, amount: u128) -> Result<bool, String> {
+        if amount >= &spend {
+            return Ok(amount >= &spend);
+        } else {
+            return Err("user does not have sufficient balance".to_string());
+        }
+    }
 
 	pub fn cancel_order(&mut self, market_id: u64, outcome: u64, order_id: u128) {
 		let from = env::predecessor_account_id();
@@ -139,28 +183,29 @@ impl Markets {
 
 	fn subtract_balance(&mut self, amount: u128) {
 		let from = env::predecessor_account_id();
-		ext_fungible_token::transfer(self.creator, amount, &from, 0, SINGLE_CALL_GAS);
+		// TODO: BE ABLE TO PARSE WHETHER THAT TRANSFER WAS SUCCESSFUL OR NOT
+		ext_fungible_token::transfer(self.creator, amount, &from, 0, SINGLE_CALL_GAS).then(
+            // For monitoring supply - just for testnet
+            self.fdai_outside_escrow = self.fdai_outside_escrow - amount as u128;
+            self.fdai_in_protocol= self.fdai_outside_escrow + amount as u128;
+		);
 		//let balance = self.fdai_balances.get(&from).unwrap();
 		//let new_balance = *balance - amount;
 		//self.fdai_balances.insert(from, new_balance);
-
-		// For monitoring supply - just for testnet
-		self.fdai_outside_escrow = self.fdai_outside_escrow - amount as u128;
-		self.fdai_in_protocol= self.fdai_outside_escrow + amount as u128;
 	}
 
 	fn add_balance(&mut self, amount: u128) {
 	    let from = env::predecessor_account_id();
-        ext_fungible_token::transfer_from(self.creator, from, amount, &self.creator, 0, SINGLE_CALL_GAS);
+        ext_fungible_token::transfer_from(self.creator, from, amount, &self.creator, 0, SINGLE_CALL_GAS).then(
+            // For monitoring supply - just for testnet
+            self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
+            self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
+        );
 
 		//let from = env::predecessor_account_id();
 		//let balance = self.fdai_balances.get(&from).unwrap();
 		//let new_balance = *balance + amount;
 		//self.fdai_balances.insert(from, new_balance);
-
-		// For monitoring supply - just for testnet
-		self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
-		self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
 	}
 
 	pub fn get_open_orders(&self, market_id: u64, outcome: u64) -> &HashMap<u128, Order> {
