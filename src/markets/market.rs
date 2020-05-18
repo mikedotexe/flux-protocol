@@ -102,6 +102,46 @@ impl Market {
 		}
 	}
 
+	pub fn market_sell(
+		&mut self,
+		outcome: u64,
+		shares_to_sell: u128
+	) -> u128 {
+		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
+		return 123;
+	}
+
+	pub fn get_market_sell_depth(
+		&self, 
+		outcome: u64,
+		shares_to_sell: u128
+	) -> u128 {
+		let orderbook = self.orderbooks.get(&outcome).unwrap();
+		let mut best_price = orderbook.best_price.unwrap_or(0)  ;
+		let mut spend_offered = 0;
+		let mut shares_fillable = shares_to_sell;
+
+		while best_price > 0 && shares_fillable > 0 {
+			// let spendable = orderbook.liquidity_by_price.get(&best_price).unwrap();
+			// let shares_sought = spendable / best_price;
+			// if shares_sought > shares_fillable {
+			// 	spend_offered += shares_fillable * best_price;
+			// 	shares_fillable = 0;
+			// 	return 0;
+			// } else {
+			// 	shares_fillable -= shares_sought;
+			// 	spend_offered += spendable;
+			// }
+
+			println!("range1 {:?}", orderbook.liquidity_by_price.range(0..best_price));
+			println!("range {:?}", orderbook.liquidity_by_price.range(0..best_price).next_back().unwrap());
+			
+		}
+
+
+		return 123;
+	}
+
 	pub fn create_order(
 		&mut self, 
 		account_id: String, 
@@ -540,11 +580,13 @@ impl Market {
 
 			lowest_liquidity = 0;
 			if market_price <= price {
-				self.update_lowest_liquidity(&inverse_orderbook_ids,
-				&first_iteration,
-				&mut lowest_liquidity,
-                &mut outcome_to_price_share_pointer,
-                &mut best_order_exists);
+				self.update_lowest_liquidity(
+					&inverse_orderbook_ids,
+					&first_iteration,
+					&mut lowest_liquidity,
+                	&mut outcome_to_price_share_pointer,
+					&mut best_order_exists
+				);
 				max_spend += lowest_liquidity * market_price;
 				max_shares += lowest_liquidity;
 			}

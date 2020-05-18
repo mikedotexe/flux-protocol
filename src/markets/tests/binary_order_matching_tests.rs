@@ -41,3 +41,20 @@ fn partial_binary_order_matching_test() {
 	assert_eq!(filled_no_orders.len(), 1);
 	assert_eq!(filled_yes_orders.len(), 2);
 }
+
+#[test]
+fn simple_binary_order_sale() {
+	testing_env!(get_context(carol(), current_block_timestamp()));
+	let mut contract = Markets::default();
+	contract.claim_fdai();
+	contract.create_market("Hi!".to_string(), empty_string(), 2, outcome_tags(0), categories(), market_end_timestamp_ms(), 0, 0, "test".to_string());
+
+	contract.place_order(0, 1, 5000, 50);
+	contract.place_order(0, 1, 5000, 50);
+	contract.place_order(0, 1, 2750, 49);
+	contract.place_order(0, 1, 2750, 50);
+
+	let sell_depth = contract.get_market_sell_depth(0, 1, 10000);
+
+	
+}
