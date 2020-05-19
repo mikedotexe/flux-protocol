@@ -69,10 +69,12 @@ impl Orderbook {
 
         // If all of spend is filled, state order is fully filled
 		let left_to_spend = spend - filled;
+		println!("lts {:?}", new_order);
 		if left_to_spend < 100 {
-			self.filled_orders.insert(price, new_order);
+			self.filled_orders.insert(order_id, new_order);
 			return;
 		}
+
 
         // If there is a remaining order, set this new order as the new market rate
 		self.set_best_price(price);
@@ -191,6 +193,11 @@ impl Orderbook {
 	) {
 		let orders_by_user = self.orders_by_user.get(&account_id).unwrap();
 		let mut shares_left = shares;
+		println!("filled orders {:?}", self.filled_orders);
+		println!("");
+		println!("open orders {:?}", self.open_orders);
+		println!("");
+		println!("");
 
 		for order_id in orders_by_user {
 			let order = self.open_orders
@@ -198,7 +205,8 @@ impl Orderbook {
 			.unwrap_or_else(| | {
 				return  self.filled_orders.get(&order_id).expect("order with this id doesn't seem to exist")
 			});
-			println!("{:?}", order);
+			println!("order {:?}", order);
+			println!("");
 			// balance -= order.shares_filled;
 		}
 	}
@@ -302,7 +310,7 @@ impl Orderbook {
 	) -> u128 {
 		let empty_vec: &Vec<u128> = &vec![];
 		let orders_by_user = self.orders_by_user.get(&account_id).unwrap_or(empty_vec);
-		println!("{:?}", orders_by_user);
+
 		let mut balance = 0;
 		for order_id in orders_by_user {
 			let order = self.open_orders
@@ -310,7 +318,6 @@ impl Orderbook {
 			.unwrap_or_else(| | {
 				return  self.filled_orders.get(&order_id).expect("order with this id doesn't seem to exist")
 			});
-			println!("{:?}", order);
 			balance += order.shares_filled;
 		}
 		return balance;
