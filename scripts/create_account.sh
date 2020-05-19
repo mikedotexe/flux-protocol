@@ -1,0 +1,1 @@
+near create_account fluxprotocol-phase-point-two --masterAccount flux-dev

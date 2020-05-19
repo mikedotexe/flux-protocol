@@ -1,47 +1,10 @@
 use super::*;
-
-// #[test]
-// fn test_categorical_market_matches() {
-// 	testing_env!(get_context(carol(), current_block_timestamp()));
-// 	let mut contract = Markets::default();
-// 	contract.claim_fdai();
-// 	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(),  market_end_timestamp());
-
-// 	contract.place_order(0, 0, 50000, 25);
-// 	contract.place_order(0, 1, 50000, 65);
-// 	contract.place_order(0, 2, 50000, 5);
-// 	contract.place_order(0, 0, 1000, 31);
-
-// 	let open_0_orders = contract.get_open_orders(0, 0);
-//     let open_1_orders = contract.get_open_orders(0, 1);
-//     let open_2_orders = contract.get_open_orders(0, 2);
-//     let filled_0_orders = contract.get_filled_orders(0, 0);
-//     let filled_1_orders = contract.get_filled_orders(0, 1);
-//     let filled_2_orders = contract.get_filled_orders(0, 2);
-
-// 	// // uncomment for orderbook state check
-// 	// println!("{:?}", open_0_orders);
-// 	// println!("{:?}", open_1_orders);
-// 	// println!("{:?}", open_2_orders);
-// 	// println!("{:?}", filled_0_orders);
-// 	// println!("{:?}", filled_1_orders);
-// 	// println!("{:?}", filled_2_orders);
-
-// 	// assertions for the orderbook lengths
-// 	assert_eq!(open_0_orders.len(), 1);
-// 	assert_eq!(open_1_orders.len(), 1);
-// 	assert_eq!(open_2_orders.len(), 1);
-// 	assert_eq!(filled_0_orders.len(), 1);
-// 	assert_eq!(filled_1_orders.len(), 0);
-// 	assert_eq!(filled_2_orders.len(), 0);
-// }
-
 #[test]
 fn test_categorical_market_automated_matcher() {
 	testing_env!(get_context(carol(), current_block_timestamp()));
 	let mut contract = Markets::default();
 	contract.claim_fdai();
-	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(),  market_end_timestamp());
+	contract.create_market("Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(),  market_end_timestamp_ms(), 0, 0, "test".to_string());
 
 	// best prices - market price = 10
 	contract.place_order(0, 0, 3000, 30);
@@ -50,21 +13,21 @@ fn test_categorical_market_automated_matcher() {
 	// worse prices - market price = 25
 	contract.place_order(0, 0, 2500, 25);
 	contract.place_order(0, 1, 5000, 50);
-	
+
 	testing_env!(get_context(alice(), current_block_timestamp()));
-	
+
 	contract.claim_fdai();
-	
+
 	// alice fills all orders
 	contract.place_order(0, 2, 3500, 25);
-	
+
 	let open_0_orders = contract.get_open_orders(0, 0);
     let open_1_orders = contract.get_open_orders(0, 1);
     let open_2_orders = contract.get_open_orders(0, 2);
     let filled_0_orders = contract.get_filled_orders(0, 0);
     let filled_1_orders = contract.get_filled_orders(0, 1);
 	let filled_2_orders = contract.get_filled_orders(0, 2);
-	
+
 	//// uncomment for orderbook state check
 	// println!("open orders outcome 0: {:?}", open_0_orders);
 	// println!("____________________________________________________");
@@ -86,12 +49,4 @@ fn test_categorical_market_automated_matcher() {
 	assert_eq!(filled_0_orders.len(), 2);
 	assert_eq!(filled_1_orders.len(), 2);
 	assert_eq!(filled_2_orders.len(), 1);
-	
-	testing_env!(get_context(carol(), market_end_timestamp()));
-	contract.resolute(0, Some(1));
-
-	let alice_claimable = contract.get_claimable(0, alice());
-	let carol_claimable = contract.get_claimable(0, carol());
-	assert_eq!(alice_claimable, 0);
-	assert_eq!(carol_claimable, 20000);
 }

@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::cmp;
 use borsh::{BorshDeserialize, BorshSerialize};
-use near_bindgen::{near_bindgen};
+use near_sdk::{near_bindgen};
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
@@ -24,7 +24,9 @@ pub struct Orderbook {
 	pub outcome_id: u64
 }
 impl Orderbook {
-	pub fn new(outcome: u64) -> Self {
+	pub fn new(
+		outcome: u64
+	) -> Self {
 		Self {
 			root: None,
 			open_orders: HashMap::new(),
@@ -41,17 +43,28 @@ impl Orderbook {
 	}
 
     // Grabs latest nonce
-	fn new_order_id(&mut self) -> u128 {
+	fn new_order_id(
+		&mut self
+	) -> u128 {
 		let id = self.nonce;
 		self.nonce = self.nonce + 1;
 		return id;
 	}
 
     // Places order in orderbook
-	pub fn place_order(&mut self, from: String, outcome: u64, spend: u128, amt_of_shares: u128, price: u128, filled: u128, shares_filled: u128) {
+	pub fn place_order(
+		&mut self, 
+		account_id: String, 
+		outcome: u64, 
+		spend: u128, 
+		amt_of_shares: u128, 
+		price: u128, 
+		filled: u128, 
+		shares_filled: u128
+	) {
 		let order_id = self.new_order_id();
-		let new_order = Order::new(from.to_string(), outcome, order_id, spend, amt_of_shares, price, filled, shares_filled);
-		*self.spend_by_user.entry(from.to_string()).or_insert(0) += spend;
+		let new_order = Order::new(account_id.to_string(), outcome, order_id, spend, amt_of_shares, price, filled, shares_filled);
+		*self.spend_by_user.entry(account_id.to_string()).or_insert(0) += spend;
 
         // If all of spend is filled, state order is fully filled
 		let left_to_spend = spend - filled;
@@ -69,14 +82,17 @@ impl Orderbook {
 		// Insert into order tree
 		let orders_at_price = self.orders_by_price.entry(price).or_insert(HashMap::new());
 		*self.liquidity_by_price.entry(price).or_insert(0) += left_to_spend;
-		
+
 		orders_at_price.insert(order_id, true);
 
-		self.orders_by_user.entry(from.to_string()).or_insert(Vec::new()).push(order_id);
+		self.orders_by_user.entry(account_id.to_string()).or_insert(Vec::new()).push(order_id);
 	}
 
     // Updates current market order price
-	fn set_best_price(&mut self, price: u128) {
+	fn set_best_price(
+		&mut self, 
+		price: u128
+	) {
 		let current_best_price = self.best_price;
 		if current_best_price.is_none() {
 			self.best_price = Some(price);
@@ -89,25 +105,28 @@ impl Orderbook {
 		}
 	}
 
-    // Remove order from orderbook -- added price - if invalid order id passed behaviour undefined
-	pub fn remove_order(&mut self, order_id: u128) -> u128 {
+    // Remove order account_id orderbook -- added price - if invalid order id passed behaviour undefined
+	pub fn remove_order(
+		&mut self, 
+		order_id: u128
+	) -> u128 {
 		// Store copy of order to remove
 		let order = self.open_orders.get_mut(&order_id).unwrap().clone();
-		
-		// Remove original order from open_orders
+
+		// Remove original order account_id open_orders
 		self.open_orders.remove(&order.id);
-		
+
 		let outstanding_spend = order.spend - order.filled;
-		
+
         *self.spend_by_user.get_mut(&order.creator).unwrap() -= outstanding_spend;
 		*self.liquidity_by_price.entry(order.price).or_insert(0) -= outstanding_spend;
-		
-        // Add back to filled if eligible, remove from user map if not
+
+        // Add back to filled if eligible, remove account_id user map if not
         if order.shares_filled > 0 {
 			self.filled_orders.insert(order.id, order.clone());
         } else {
 			let order_by_user_vec = self.orders_by_user.get_mut(&order.creator).unwrap();
-			
+
 			// Keep all orders that aren't order_id using the retain method
             order_by_user_vec.retain(|owned_order_id| &order_id != owned_order_id);
             if order_by_user_vec.is_empty() {
@@ -115,7 +134,7 @@ impl Orderbook {
             }
 		}
 
-		// Remove from order tree
+		// Remove account_id order tree
 		let order_map = self.orders_by_price.get_mut(&order.price).unwrap();
         order_map.remove(&order_id);
         if order_map.is_empty() {
@@ -130,18 +149,20 @@ impl Orderbook {
 	}
 
 	// TODO: Should catch these rounding errors earlier, right now some "dust" will be lost.
-	pub fn fill_best_orders(&mut self, mut amt_of_shares_to_fill: u128) {
+	pub fn fill_best_orders(
+		&mut self, 
+		mut amt_of_shares_to_fill: u128
+	) {
 	    let mut to_remove : Vec<(u128, u128)> = vec![];
 
 		if let Some(( _ , current_order_map)) = self.orders_by_price.iter_mut().next() {
 			// Iteratively fill market orders until done
             for (order_id, _) in current_order_map.iter_mut() {
 				let order = self.open_orders.get_mut(&order_id).unwrap();
-				// println!("get here: {:?}, {:?}", order_id, self.open_orders);
                 if amt_of_shares_to_fill > 0 {
                     let shares_remaining_in_order = order.amt_of_shares - order.shares_filled;
 					let filling = cmp::min(shares_remaining_in_order, amt_of_shares_to_fill);
-					
+
 					*self.liquidity_by_price.entry(order.price).or_insert(0) -= filling * order.price;
 
                     order.shares_filled += filling;
@@ -164,10 +185,13 @@ impl Orderbook {
 		}
 	}
 
-	pub fn calc_claimable_amt(&self, from: String) -> u128 {
+	pub fn calc_claimable_amt(
+		&self, 
+		account_id: String
+	) -> u128 {
 		let mut claimable = 0;
 		let empty_vec: Vec<u128> = vec![];
-		let orders_by_user_vec = self.orders_by_user.get(&from).unwrap_or(&empty_vec);
+		let orders_by_user_vec = self.orders_by_user.get(&account_id).unwrap_or(&empty_vec);
 		for i in 0..orders_by_user_vec.len() {
 			let order_id = &orders_by_user_vec[i];
 			let open_order_prom = self.open_orders.get(&order_id);
@@ -186,18 +210,33 @@ impl Orderbook {
 		return claimable;
 	}
 
-	// TODO: shouldn't be deleted but maybe flagged claimed - this way we can retain an order history
-	pub fn delete_orders_for(&mut self, from: String) {
+	pub fn delete_orders_for(
+		&mut self, 
+		account_id: String
+	) {
 		let empty_vec = &mut vec![];
-		let orders_by_user_copy = self.orders_by_user.get(&from).unwrap_or(empty_vec).clone();
-		self.claimed_orders_by_user.insert(from.to_string(), orders_by_user_copy);
-        *self.orders_by_user.get_mut(&from).unwrap_or(empty_vec) = vec![];
+		let orders_by_user_copy = self.orders_by_user.get(&account_id).unwrap_or(empty_vec).clone();
+		
+		self.spend_by_user
+		.entry(account_id.to_string())
+		.and_modify(|spend| { *spend = 0; })
+		.or_insert(0);
+
+		self.claimed_orders_by_user
+		.insert(account_id.to_string(), orders_by_user_copy);
+
+		*self.orders_by_user
+		.get_mut(&account_id)
+		.unwrap_or(empty_vec) = vec![];
 	}
 
-    fn remove_filled_order(&mut self, order_id : u128) {
+    fn remove_filled_order(
+		&mut self, 
+		order_id : u128
+	) {
         // Get filled orders at price
         let order = self.filled_orders.get(&order_id).unwrap();
-        // Remove order from user map
+        // Remove order account_id user map
         let order_by_user_map = self.orders_by_user.get_mut(&order.creator).unwrap();
         order_by_user_map.remove(order_id.try_into().unwrap());
         if order_by_user_map.is_empty() {
@@ -206,14 +245,19 @@ impl Orderbook {
         self.filled_orders.remove(&order_id);
     }
 
-	pub fn get_best_price(&self) -> u128 {
+	pub fn get_best_price(
+		&self
+	) -> u128 {
 		return self.best_price.unwrap();
 	}
 
-	pub fn get_open_order_value_for(&self, from: String) -> u128 {
+	pub fn get_open_order_value_for(
+		&self, 
+		account_id: String
+	) -> u128 {
 		let mut claimable = 0;
 		let empty_vec: Vec<u128> = vec![];
-		let orders_by_user_vec = self.orders_by_user.get(&from).unwrap_or(&empty_vec);
+		let orders_by_user_vec = self.orders_by_user.get(&account_id).unwrap_or(&empty_vec);
 
         for i in 0..orders_by_user_vec.len() {
 			let order_id = orders_by_user_vec[i];
@@ -227,11 +271,18 @@ impl Orderbook {
 		return claimable;
 	}
 
-	pub fn get_spend_by(&self, from: String) -> u128 {
-		return *self.spend_by_user.get(&from).unwrap_or(&0);
+	pub fn get_spend_by(
+		&self, 
+		account_id: String
+	) -> u128 {
+		return *self.spend_by_user.get(&account_id).unwrap_or(&0);
 	}
-	
-	pub fn get_liquidity_for_price(&self, price: u128) -> u128 {
+
+	// TODO test if decrements on order fill
+	pub fn get_liquidity_at_price(
+		&self, 
+		price: u128
+	) -> u128 {
 		let spend_liquidity = *self.liquidity_by_price.get(&price).unwrap_or(&0);
 		if spend_liquidity == 0 {
 			return 0
