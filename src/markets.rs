@@ -109,7 +109,7 @@ impl Markets {
     pub fn grant_fdai(&mut self, from: String, check_result: Result<bool, String>) {
         if let Ok(true) = check_result {
             let claim_amount = 100 * self.dai_token();
-            ext_fungible_token::transfer_from(self.creator.to_string(), from, claim_amount, &self.creator, 0, SINGLE_CALL_GAS);
+            ext_fungible_token::transfer_from(env::current_account_id(), from, claim_amount, &env::current_account_id(), 0, SINGLE_CALL_GAS);
         }
     }
 
@@ -178,7 +178,7 @@ impl Markets {
         let market = self.active_markets.get_mut(&market_id).unwrap();
         market.place_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price);
 
-        self.subtract_balance(rounded_spend);
+        self.escrow_funds(rounded_spend);
     }
 
 	pub fn cancel_order(&mut self, market_id: u64, outcome: u64, order_id: u128) {
@@ -197,10 +197,10 @@ impl Markets {
 		market.resolute(from, winning_outcome);
 	}
 
-	fn subtract_balance(&mut self, amount: u128) {
+	fn escrow_funds(&mut self, amount: u128) {
 		let from = env::predecessor_account_id();
 		// TODO: BE ABLE TO PARSE WHETHER THAT TRANSFER WAS SUCCESSFUL OR NOT
-		ext_fungible_token::transfer(self.creator.to_string(), amount, &from, 0, SINGLE_CALL_GAS).then(
+		ext_fungible_token::transfer(env::current_account_id(), amount, &from, 0, SINGLE_CALL_GAS).then(
             ext::update_fdai_metrics_subtract(amount, &env::current_account_id(), 0, SINGLE_CALL_GAS)
 		);
 		//let balance = self.fdai_balances.get(&from).unwrap();
@@ -216,12 +216,11 @@ impl Markets {
         self.fdai_in_protocol= self.fdai_outside_escrow + amount as u128;
     }
 
-	fn add_balance(&mut self, amount: u128) {
+	fn payout(&mut self, amount: u128) {
 	    let from = env::predecessor_account_id();
-        ext_fungible_token::transfer_from(self.creator.to_string(), from.to_string(), amount, &self.creator, 0, SINGLE_CALL_GAS).then(
+        ext_fungible_token::transfer_from(env::current_account_id(), from.to_string(), amount, &env::current_account_id(), 0, SINGLE_CALL_GAS).then(
             ext::update_fdai_metrics_add(amount,  &env::current_account_id(), 0, SINGLE_CALL_GAS)
         );
-
 		//let from = env::predecessor_account_id();
 		//let balance = self.fdai_balances.get(&from).unwrap();
 		//let new_balance = *balance + amount;
@@ -260,7 +259,7 @@ impl Markets {
 		let claimable = market.get_claimable(account_id.to_string());
 		market.delete_orders_for(account_id.to_string());
 
-		self.add_balance(claimable);
+		self.payout(claimable);
 	}
 
 	pub fn get_all_markets(&self) -> &BTreeMap<u64, Market> {
