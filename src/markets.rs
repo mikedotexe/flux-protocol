@@ -340,6 +340,7 @@ impl Markets {
 		outcome: u64,
 		shares: u128,
 	) {
+		assert!(shares > 0, "can't sell no shares");
 		let market = self.markets.get_mut(&market_id).expect("non existent market");
 		let earnings = market.market_sell(outcome, shares);
 		// Add earnings

@@ -110,7 +110,9 @@ impl Market {
 		let (to_market_fill, shares_to_fill) = self.get_dynamic_market_sell_offer(outcome, shares_to_sell);
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
 		let user_balance = orderbook.get_share_balance(env::predecessor_account_id());
+		assert!(user_balance < shares_to_sell, "user doesn't hold enough shares to sell");
 		orderbook.fill_best_orders(shares_to_fill);
+		orderbook.subtract_shares(shares_to_fill, env::predecessor_account_id());
 		return to_market_fill;
 	}
 

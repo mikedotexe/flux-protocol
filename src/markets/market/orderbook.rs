@@ -65,6 +65,7 @@ impl Orderbook {
 		let order_id = self.new_order_id();
 		let new_order = Order::new(account_id.to_string(), outcome, order_id, spend, amt_of_shares, price, filled, shares_filled);
 		*self.spend_by_user.entry(account_id.to_string()).or_insert(0) += spend;
+		self.orders_by_user.entry(account_id.to_string()).or_insert(Vec::new()).push(order_id);
 
         // If all of spend is filled, state order is fully filled
 		let left_to_spend = spend - filled;
@@ -84,8 +85,6 @@ impl Orderbook {
 		*self.liquidity_by_price.entry(price).or_insert(0) += left_to_spend;
 
 		orders_at_price.insert(order_id, true);
-
-		self.orders_by_user.entry(account_id.to_string()).or_insert(Vec::new()).push(order_id);
 	}
 
     // Updates current market order price
@@ -182,6 +181,25 @@ impl Orderbook {
 
 		for entry in to_remove {
 		    self.remove_order(entry.0);
+		}
+	}
+
+	pub fn subtract_shares(
+		&mut self, 
+		shares: u128, 
+		account_id: String
+	) {
+		let orders_by_user = self.orders_by_user.get(&account_id).unwrap();
+		let mut shares_left = shares;
+
+		for order_id in orders_by_user {
+			let order = self.open_orders
+			.get(&order_id)
+			.unwrap_or_else(| | {
+				return  self.filled_orders.get(&order_id).expect("order with this id doesn't seem to exist")
+			});
+			println!("{:?}", order);
+			// balance -= order.shares_filled;
 		}
 	}
 
@@ -284,11 +302,18 @@ impl Orderbook {
 	) -> u128 {
 		let empty_vec: &Vec<u128> = &vec![];
 		let orders_by_user = self.orders_by_user.get(&account_id).unwrap_or(empty_vec);
+		println!("{:?}", orders_by_user);
 		let mut balance = 0;
 		for order_id in orders_by_user {
-			println!("{}", order_id);
+			let order = self.open_orders
+			.get(&order_id)
+			.unwrap_or_else(| | {
+				return  self.filled_orders.get(&order_id).expect("order with this id doesn't seem to exist")
+			});
+			println!("{:?}", order);
+			balance += order.shares_filled;
 		}
-		return 123;
+		return balance;
 	}
 
 	// TODO test if decrements on order fill
