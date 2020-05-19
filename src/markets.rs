@@ -334,16 +334,38 @@ impl Markets {
 		return markets;
 	}
 	
+	fn dynamic_market_sell(
+		&mut self,
+		market_id: u64,
+		outcome: u64,
+		shares: u128,
+	) {
+		let market = self.markets.get_mut(&market_id).expect("non existent market");
+		let earnings = market.market_sell(outcome, shares);
+		// Add earnings
+	}
 
 	fn get_market_sell_depth(
 		&self, 
 		market_id: u64,
 		outcome: u64,
 		shares: u128,
+	) -> (u128, u128) {
+		let market = self.markets.get(&market_id).expect("non existent market");
+		return market.get_dynamic_market_sell_offer(outcome, shares);
+	}
+
+	fn get_outcome_share_balance(
+		&self,
+		market_id: u64,
+		outcome: u64,
+		account_id: String
 	) -> u128 {
 		let market = self.markets.get(&market_id).expect("non existent market");
-		return market.get_market_sell_depth(outcome, shares);
+		let orderbook = market.orderbooks.get(&outcome).expect("non existent outcome");
+		return orderbook.get_share_balance(account_id);
 	}
+
 
 	pub fn get_depth(
 		&self, 

@@ -278,6 +278,19 @@ impl Orderbook {
 		return *self.spend_by_user.get(&account_id).unwrap_or(&0);
 	}
 
+	pub fn get_share_balance(
+		&self,
+		account_id: String
+	) -> u128 {
+		let empty_vec: &Vec<u128> = &vec![];
+		let orders_by_user = self.orders_by_user.get(&account_id).unwrap_or(empty_vec);
+		let mut balance = 0;
+		for order_id in orders_by_user {
+			println!("{}", order_id);
+		}
+		return 123;
+	}
+
 	// TODO test if decrements on order fill
 	pub fn get_liquidity_at_price(
 		&self, 

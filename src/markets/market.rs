@@ -107,39 +107,44 @@ impl Market {
 		outcome: u64,
 		shares_to_sell: u128
 	) -> u128 {
+		let (to_market_fill, shares_to_fill) = self.get_dynamic_market_sell_offer(outcome, shares_to_sell);
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
-		return 123;
+		let user_balance = orderbook.get_share_balance(env::predecessor_account_id());
+		orderbook.fill_best_orders(shares_to_fill);
+		return to_market_fill;
 	}
 
-	pub fn get_market_sell_depth(
+	pub fn get_dynamic_market_sell_offer(
 		&self, 
 		outcome: u64,
 		shares_to_sell: u128
-	) -> u128 {
+	) -> (u128, u128) {
 		let orderbook = self.orderbooks.get(&outcome).unwrap();
-		let mut best_price = orderbook.best_price.unwrap_or(0)  ;
-		let mut spend_offered = 0;
+		let mut best_price = orderbook.best_price.unwrap_or(0);
+		let mut liq_at_price = orderbook.liquidity_by_price.get(&best_price).unwrap();
+		let mut spendable = 0;
 		let mut shares_fillable = shares_to_sell;
 
 		while best_price > 0 && shares_fillable > 0 {
-			// let spendable = orderbook.liquidity_by_price.get(&best_price).unwrap();
-			// let shares_sought = spendable / best_price;
-			// if shares_sought > shares_fillable {
-			// 	spend_offered += shares_fillable * best_price;
-			// 	shares_fillable = 0;
-			// 	return 0;
-			// } else {
-			// 	shares_fillable -= shares_sought;
-			// 	spend_offered += spendable;
-			// }
-
-			println!("range1 {:?}", orderbook.liquidity_by_price.range(0..best_price));
-			println!("range {:?}", orderbook.liquidity_by_price.range(0..best_price).next_back().unwrap());
-			
+			let shares_sought = liq_at_price / best_price;
+			if shares_sought > shares_fillable {
+				spendable += shares_fillable * best_price;
+				shares_fillable = 0;
+				return (spendable, 0);
+			} else {
+				shares_fillable -= shares_sought;
+				spendable += liq_at_price;
+			}
+					
+			let (next_price, liq_at_next_price) = orderbook.liquidity_by_price.range(0..best_price).next_back().unwrap_or((&0, &0));
+			best_price = *next_price;
+			liq_at_price = liq_at_next_price;
 		}
 
+		// Fill orders
+		// Remove balances from sender
 
-		return 123;
+		return (spendable, shares_to_sell - shares_fillable);
 	}
 
 	pub fn create_order(

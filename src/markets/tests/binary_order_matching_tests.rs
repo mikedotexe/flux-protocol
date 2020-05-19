@@ -55,6 +55,7 @@ fn simple_binary_order_sale() {
 	contract.place_order(0, 1, 2750, 50);
 
 	let sell_depth = contract.get_market_sell_depth(0, 1, 10000);
-
+	let share_balance = contract.get_outcome_share_balance(0, 1, carol());
+	// contract.dynamic_market_sell(0, 0, )
 	
 }
