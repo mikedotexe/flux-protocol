@@ -45,6 +45,7 @@ pub trait ExtContract {
     fn update_fdai_metrics_subtract(&mut self, amount: u128);
     fn update_fdai_metrics_add(&mut self, amount: u128);
     fn purchase_shares(&mut self, from: String, market_id: u64, outcome: u64, spend: u128, price: u128);
+    fn resolute_approved(&mut self, market_id: u64, winning_outcome: Option<u64>, stake: u128);
 }
 
 #[near_bindgen]
@@ -183,8 +184,7 @@ impl Markets {
         let amount_of_shares = spend / price;
         let rounded_spend = amount_of_shares * price;
         let market = self.active_markets.get_mut(&market_id).unwrap();
-        market.place_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price);
-
+        market.create_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price);
         self.escrow_funds(rounded_spend);
     }
 
@@ -195,7 +195,7 @@ impl Markets {
         outcome: u64,
         order_id: u128
     ) {
-		let from = env::predecessor_account_id();
+		let account_id = env::predecessor_account_id();
 		let market = self.active_markets.get_mut(&market_id).unwrap();
 		assert_eq!(market.resoluted, false);
 		let mut orderbook = market.orderbooks.get_mut(&outcome).unwrap();
@@ -211,16 +211,28 @@ impl Markets {
 		winning_outcome: Option<u64>,
 		stake: u128
 	) {
-		let account_id = env::predecessor_account_id();
-		let balance = self.get_fdai_balance(account_id.to_string());
-        assert!(balance >= stake, "not enough balance to cover stake");
-		let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
-		assert_eq!(market.resoluted, false);
-
-
-		let change = market.resolute(winning_outcome, stake);
-		self.escrow_funds(stake - change);
+	    let account_id = env::predecessor_account_id();
+        ext_fungible_token::get_balance(account_id.to_string(), &account_id.to_string(), 0, SINGLE_CALL_GAS).then(
+            ext::check_sufficient_balance(stake, &account_id.to_string(), 0, SINGLE_CALL_GAS)
+        ).then(
+            ext::resolute_approved(market_id, winning_outcome, stake, &account_id.to_string(), 0, SINGLE_CALL_GAS)
+        );
 	}
+
+    #[callback]
+    pub fn resolute_approved(
+        &mut self,
+        market_id: u64,
+        winning_outcome: Option<u64>,
+        stake: u128
+    ) {
+        let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
+        assert_eq!(market.resoluted, false);
+        let change = market.resolute(winning_outcome, stake);
+        self.escrow_funds(stake - change);
+    }
+
+
 
 	pub fn withdraw_dispute_stake(
 		&mut self,
