@@ -1,4 +1,4 @@
-use near_sdk::{near_bindgen, env, ext_contract, Promise, PromiseOrValue, callback_vec, callback};
+use near_sdk::{near_bindgen, env, ext_contract, Promise, callback_vec, callback};
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::collections::{BTreeMap, HashMap};
 use serde::{Deserialize, Serialize};

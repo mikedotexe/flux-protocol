@@ -1,4 +1,5 @@
 #[macro_use]
+use near_crypto::{InMemorySigner, KeyType, Signer};
 use near_runtime_standalone::{init_runtime_and_signer, RuntimeStandalone};
 use near_primitives::{
     account::{AccessKey, Account},
@@ -7,6 +8,10 @@ use near_primitives::{
     transaction::{ExecutionOutcome, ExecutionStatus, Transaction},
     types::{AccountId, Balance},
 };
+
+use std::collections::{HashMap};
+use super::markets;
+type Order = markets::market::orderbook::order::Order;
 
 use serde_json::json;
 
@@ -47,7 +52,6 @@ impl ExternalUser {
             let tx = self
                 .new_tx(runtime, "flux-tests".to_string())
                 .create_account()
-                .transfer(amount)
                 .deploy_contract(MARKETS_BYTES.to_vec())
                 .function_call("default".into(), args, 10000000000000000, 0)
                 .sign(&self.signer);
@@ -162,7 +166,7 @@ impl ExternalUser {
             .unwrap()
             .0;
         //TODO: UPDATE THIS CASTING
-        u128::from(serde_json::from_slice::<U128>(open_orders.as_slice()).unwrap())
+        &HashMap<u128, Order>::from(serde_json::from_slice::HashMap<u128, Order>(open_orders.as_slice()).unwrap())
     }
 
     pub fn get_filled_orders(&self, runtime: &RuntimeStandalone, market_id: u64, outcome: u64) -> &HashMap<u128, Order> {
@@ -177,7 +181,7 @@ impl ExternalUser {
             .unwrap()
             .0;
         //TODO: UPDATE THIS CASTING
-        u128::from(serde_json::from_slice::<U128>(filled_orders.as_slice()).unwrap())
+        &HashMap<u128, Order>::from(serde_json::from_slice::HashMap<u128, Order>(open_orders.as_slice()).unwrap())
     }
 
 }
