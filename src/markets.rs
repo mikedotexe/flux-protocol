@@ -77,8 +77,8 @@ impl Markets {
 		outcome_tags: Vec<String>,
 		categories: Vec<String>,
 		end_time: u64,
-		fee_percentage: u128,
-		cost_percentage: u128,
+		creator_fee_percentage: u128,
+		affiliate_fee_percentage: u128,
 		api_source: String
 	) -> u64 {
 		assert!(outcomes > 1);
@@ -86,15 +86,14 @@ impl Markets {
 		assert!(outcomes < 20); // up for change
 		assert!(end_time > env::block_timestamp() / 1000000);
 		assert!(categories.len() < 6);
-		assert!(fee_percentage <= self.max_fee_percentage);
-		assert!(fee_percentage >= cost_percentage);
+		assert!(creator_fee_percentage <= self.max_fee_percentage);
 
 		if outcomes == 2 {assert!(outcome_tags.len() == 0)}
 		// TODO check if end_time hasn't happened yet
 		let account_id = env::predecessor_account_id();
 
 		// TODO: Escrow bond account_id creator's account
-		let new_market = Market::new(self.nonce, account_id, description, extra_info, outcomes, outcome_tags, categories, end_time, fee_percentage, cost_percentage, api_source);
+		let new_market = Market::new(self.nonce, account_id, description, extra_info, outcomes, outcome_tags, categories, end_time, creator_fee_percentage, 1, affiliate_fee_percentage ,api_source);
 		let market_id = new_market.id;
 		self.active_markets.insert(self.nonce, new_market);
 		self.nonce = self.nonce + 1;
@@ -115,7 +114,8 @@ impl Markets {
 		market_id: u64, 
 		outcome: u64, 
 		spend: u128, 
-		price: u128
+		price: u128,
+		affiliate_account_id: Option<String>
 	) {
 		let account_id = env::predecessor_account_id();
 		let balance = self.get_fdai_balance(account_id.to_string());
@@ -124,7 +124,7 @@ impl Markets {
 		let amount_of_shares = spend / price;
 		let rounded_spend = amount_of_shares * price;
 		let market = self.active_markets.get_mut(&market_id).unwrap();
-		market.create_order(account_id.to_string(), outcome, amount_of_shares, rounded_spend, price);
+		market.create_order(account_id.to_string(), outcome, amount_of_shares, rounded_spend, price, affiliate_account_id);
 
 		self.subtract_balance(rounded_spend);
 	}
@@ -283,8 +283,8 @@ impl Markets {
 		let creator = market.creator.to_string();
 		assert_eq!(market.fee_claimed, false, "creator already claimed fees");
 		assert_eq!(env::predecessor_account_id(), creator.to_string(), "only creator himself can claim the fees");
-		// TODO: liquidity, as it is now is not the right metric, filled volume would be
-		let fee_payout = market.liquidity * market.fee_percentage / 100;
+
+		let fee_payout = market.filled_volume * market.creator_fee_percentage / 100;
 		market.fee_claimed = true;
 		self.add_balance(fee_payout, creator.to_string());
 	}
@@ -498,12 +498,13 @@ mod tests {
 		}
 	}
 
-	mod init_tests;
-	mod market_order_tests;
-	mod binary_order_matching_tests;
-	mod categorical_market_tests;
-	mod market_depth_tests;
-	mod claim_earnings_tests;
-	mod market_dispute_tests;
-	mod market_resolution_tests;
+	// mod init_tests;
+	// mod market_order_tests;
+	// mod binary_order_matching_tests;
+	// mod categorical_market_tests;
+	// mod market_depth_tests;
+	// mod claim_earnings_tests;
+	// mod market_dispute_tests;
+	// mod market_resolution_tests;
+	mod fee_payout_tests;
 }

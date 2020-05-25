@@ -15,6 +15,7 @@ pub struct Order {
 	pub filled: u128,
 	pub shares_filled: u128,
 	pub creation_time: u128,
+	pub affiliate_account_id: Option<String>
 }
 
 impl Order {
@@ -26,7 +27,8 @@ impl Order {
 		amt_of_shares: u128, 
 		price: u128, 
 		filled: u128, 
-		shares_filled: u128
+		shares_filled: u128,
+		affiliate_account_id: Option<String>
 	) -> Self {
 		let creation_time = env::block_timestamp() / 1000000;
 
@@ -39,7 +41,8 @@ impl Order {
 			price,
 			filled,
 			shares_filled,
-			creation_time: creation_time as u128
+			creation_time: creation_time as u128,
+			affiliate_account_id
 		}
 	}
 }

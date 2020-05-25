@@ -60,10 +60,11 @@ impl Orderbook {
 		amt_of_shares: u128, 
 		price: u128, 
 		filled: u128, 
-		shares_filled: u128
+		shares_filled: u128,
+		affiliate_account_id: Option<String>
 	) {
 		let order_id = self.new_order_id();
-		let new_order = Order::new(account_id.to_string(), outcome, order_id, spend, amt_of_shares, price, filled, shares_filled);
+		let new_order = Order::new(account_id.to_string(), outcome, order_id, spend, amt_of_shares, price, filled, shares_filled, affiliate_account_id);
 		*self.spend_by_user.entry(account_id.to_string()).or_insert(0) += spend;
 
         // If all of spend is filled, state order is fully filled

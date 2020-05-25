@@ -35,12 +35,13 @@ pub struct Market {
 	pub winning_outcome: Option<u64>, // invalid has outcome id: self.outcomes
 	pub resoluted: bool,
 	pub resolute_bond: u128,
-	pub liquidity: u128,
+	pub filled_volume: u128,
 	pub disputed: bool,
 	pub finalized: bool,
 	pub fee_claimed: bool,
-	pub fee_percentage: u128,
-	pub cost_percentage: u128,
+	pub creator_fee_percentage: u128,
+	pub resolution_fee_percentage: u128,
+	pub affiliate_fee_percentage: u128,
 	pub api_source: String,
 	pub resolution_windows: Vec<ResolutionWindow>
 }
@@ -56,8 +57,9 @@ impl Market {
 		outcome_tags: Vec<String>, 
 		categories: Vec<String>, 
 		end_time: u64, 
-		fee_percentage: u128, 
-		cost_percentage: u128, 
+		creator_fee_percentage: u128, 
+		resolution_fee_percentage: u128, 
+		affiliate_fee_percentage: u128,
 		api_source: String
 	) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
@@ -91,12 +93,13 @@ impl Market {
 			winning_outcome: None,
 			resoluted: false,
 			resolute_bond: 5 * base.pow(17),
-			liquidity: 0,
+			filled_volume: 0,
 			disputed: false,
 			finalized: false,
 			fee_claimed: false,
-			fee_percentage,
-			cost_percentage,
+			creator_fee_percentage,
+			resolution_fee_percentage,
+			affiliate_fee_percentage,
 			api_source,
 			resolution_windows: vec![base_resolution_window]
 		}
@@ -108,7 +111,8 @@ impl Market {
 		outcome: u64, 
 		amt_of_shares: u128, 
 		spend: u128, 
-		price: u128
+		price: u128,
+		affiliate_account_id: Option<String>
 	) {
 		assert!(spend > 0);
 		assert!(price > 0 && price < 100);
@@ -116,10 +120,9 @@ impl Market {
 		assert!(env::block_timestamp() / 1000000 < self.end_time);
 		let (spend_left, shares_filled) = self.fill_matches(outcome, spend, price);
 		let total_spend = spend - spend_left;
-		self.liquidity += shares_filled * 100;
-		let shares_filled = shares_filled;
+		self.filled_volume += shares_filled * 100;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
-		orderbook.place_order(account_id, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
+		orderbook.place_order(account_id, outcome, spend, amt_of_shares, price, total_spend, shares_filled, affiliate_account_id);
 	}
 
 	fn fill_matches(
@@ -274,8 +277,6 @@ impl Market {
 			self.resolution_windows.push(new_resolution_window);
 		} 
 
-
-
 		return to_return;
 	}
 
@@ -381,7 +382,7 @@ impl Market {
 
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
 			let winning_value = winning_orderbook.calc_claimable_amt(account_id.to_string());
-			claimable += winning_value * (100-self.fee_percentage)/100;
+			claimable += winning_value * (100-self.creator_fee_percentage)/100;
 		}
 
 		// Claiming Dispute Earnings
@@ -579,36 +580,6 @@ impl Market {
 				*staked = 0
 			})
 			.or_insert(0);
-		}
-	}
-
-}
-
-impl Default for Market {
-	fn default() -> Self {
-		Self {
-			id: 0,
-			description: "".to_string(),
-			extra_info: "".to_string(),
-			creator: "".to_string(),
-			outcomes: 0,
-			outcome_tags: vec![],
-			categories: vec![],
-			last_price_for_outcomes: HashMap::new(),
-			creation_time: 0,
-			end_time: 0,
-			orderbooks: BTreeMap::new(),
-			winning_outcome: None,
-			resoluted: false,
-			resolute_bond: 0,
-			liquidity: 0,
-			disputed: false,
-			finalized: false,
-			fee_claimed: false,
-			fee_percentage: 0,
-			cost_percentage: 0,
-			api_source: "".to_string(),
-			resolution_windows: vec![]
 		}
 	}
 }
