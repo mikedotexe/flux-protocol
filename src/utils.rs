@@ -1,3 +1,4 @@
+#[macro_use]
 use near_runtime_standalone::{init_runtime_and_signer, RuntimeStandalone};
 use near_primitives::{
     account::{AccessKey, Account},
@@ -6,6 +7,8 @@ use near_primitives::{
     transaction::{ExecutionOutcome, ExecutionStatus, Transaction},
     types::{AccountId, Balance},
 };
+
+use serde_json::json;
 
 type TxResult = Result<ExecutionOutcome, ExecutionOutcome>;
 
@@ -33,13 +36,16 @@ pub struct ExternalUser {
 }
 
 impl ExternalUser {
+    pub fn new(account_id: AccountId, signer: InMemorySigner) -> Self {
+        Self { account_id, signer }
+    }
 
     pub fn markets_init_new(&self, runtime: &mut RuntimeStandalone) -> TxResult {
             let args = json!({}).to_string().as_bytes().to_vec();
 
             // TODO: REPLACE POOL_ACCOUNT_ID with the correct destination address for contract
             let tx = self
-                .new_tx(runtime, POOL_ACCOUNT_ID.into())
+                .new_tx(runtime, "flux-tests".to_string())
                 .create_account()
                 .transfer(amount)
                 .deploy_contract(MARKETS_BYTES.to_vec())
@@ -71,9 +77,8 @@ impl ExternalUser {
             .as_bytes()
             .to_vec();
 
-        // TODO: AGAIN SEND TX TO CORRECT ACCOUNT ID
         let tx = self
-            .new_tx(runtime, POOL_ACCOUNT_ID.into())
+            .new_tx(runtime, "flux-tests".to_string())
             .function_call("claim_fdai".into(), args, 10000000000000000, 0)
             .sign(&self.signer);
         let res = runtime.resolve_tx(tx).unwrap();
@@ -84,7 +89,7 @@ impl ExternalUser {
     pub fn create_market(
         &self,
         runtime: &mut RuntimeStandalone,
-        description: String
+        description: String,
         extra_info: String,
         outcomes: u64,
         outcome_tags: Vec<String>,
@@ -92,7 +97,7 @@ impl ExternalUser {
         end_time: u64,
         fee_percentage: u128,
         cost_percentage: u128,
-        api_source: String
+        api_source: String,
     ) -> TxResult {
         let args = json!({
             "description": description,
@@ -102,14 +107,14 @@ impl ExternalUser {
             "end_time": end_time,
             "fee_percentage": fee_percentage,
             "cost_percentage": cost_percentage,
-            "api_source": api_source
+            "api_source": api_source,
         })
             .to_string()
             .as_bytes()
             .to_vec();
         // TODO: DECIDE WHERE TO SEND TRANSACTION
         let tx = self
-            .new_tx(runtime, POOL_ACCOUNT_ID.into())
+            .new_tx(runtime, "flux-tests".to_string())
             .function_call("create_market".into(), args, 10000000000000000, 0)
             .sign(&self.signer);
         let res = runtime.resolve_tx(tx).unwrap();
@@ -119,24 +124,24 @@ impl ExternalUser {
 
     pub fn place_order(
         &self,
-        runtime: &mut RuntimeStandalone
+        runtime: &mut RuntimeStandalone,
         market_id: u64,
         outcome: u64,
         spend: u128,
-        price: u128
+        price: u128,
     ) -> TxResult {
         let args = json!({
             "market_id": market_id,
             "outcome": outcome,
             "spend": spend,
-            "price": price
+            "price": price,
         })
             .to_string()
             .as_bytes()
             .to_vec();
         // TODO: UPDATE WHERE TO SEND TX TO
         let tx = self
-            .new_tx(runtime, POOL_ACCOUNT_ID.into())
+            .new_tx(runtime, "flux-tests".to_string())
             .function_call("place_order".into(), args, 10000000000000000, 0)
             .sign(&self.signer);
         let res = runtime.resolve_tx(tx).unwrap();
@@ -148,7 +153,7 @@ impl ExternalUser {
         // TODO: SPECIFY WHAT ACCOUNT TO CALL TO
         let open_orders = runtime
             .view_method_call(
-                &POOL_ACCOUNT_ID.into(),
+                &("flux-tests".to_string()),
                 "get_open_orders",
                 json!({"market_id": market_id, "outcome": outcome})
                     .to_string()
@@ -163,7 +168,7 @@ impl ExternalUser {
     pub fn get_filled_orders(&self, runtime: &RuntimeStandalone, market_id: u64, outcome: u64) -> &HashMap<u128, Order> {
         let filled_orders = runtime
             .view_method_call(
-                &POOL_ACCOUNT_ID.into(),
+                &("flux-tests".to_string()),
                 "get_filled_orders",
                 json!({"market_id": market_id, "outcome": outcome})
                     .to_string()

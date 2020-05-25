@@ -1,6 +1,5 @@
-mod utils;
 use super::*;
-use utils::{init_markets_contract, ntoy, ExternalUser};
+use super::utils::{init_markets_contract, ntoy, ExternalUser};
 
 #[test]
 fn test_categorical_market_automated_matcher() {
