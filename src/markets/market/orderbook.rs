@@ -189,26 +189,34 @@ impl Orderbook {
 	pub fn calc_claimable_amt(
 		&self, 
 		account_id: String
-	) -> u128 {
+	) -> (u128, HashMap<String, u128>) {
 		let mut claimable = 0;
 		let empty_vec: Vec<u128> = vec![];
 		let orders_by_user_vec = self.orders_by_user.get(&account_id).unwrap_or(&empty_vec);
+		let mut affiliates: HashMap<String, u128> = HashMap::new();
 		for i in 0..orders_by_user_vec.len() {
-			let order_id = &orders_by_user_vec[i];
-			let open_order_prom = self.open_orders.get(&order_id);
-			let open_order_exists = !open_order_prom.is_none();
-			if open_order_exists {
-				// Handle amount
-				let order = open_order_prom.unwrap();
-				claimable += order.shares_filled * 100;
-			} else {
-				// Check if completely filled or if it's a canceled order.
-				let filled_order = self.filled_orders.get(&order_id).unwrap();
-				claimable += filled_order.shares_filled * 100;
+			let order = self.open_orders
+			.get(&orders_by_user_vec[i])
+			.unwrap_or_else(|| {
+				return self.filled_orders
+				.get(&orders_by_user_vec[i])
+				.expect("Order by user doesn't seem to exist");
+			});
+			
+			// If there is in fact an affiliate connected to this order
+			if !order.affiliate_account_id.is_none() {
+				let affiliate_account = order.affiliate_account_id.as_ref().unwrap();
+				affiliates
+				.entry(affiliate_account.to_string())
+				.and_modify(|balance| {
+					*balance += order.shares_filled * 100;
+				})
+				.or_insert(order.shares_filled * 100);
 			}
+			claimable += order.shares_filled * 100;
 		}
 
-		return claimable;
+		return (claimable, affiliates);
 	}
 
 	pub fn delete_orders_for(

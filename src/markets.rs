@@ -272,22 +272,13 @@ impl Markets {
 		market_id: u64, 
 		account_id: String
 	) -> u128 {
-		return self.active_markets.get(&market_id).unwrap().get_claimable_for(account_id);
+		let market = self.active_markets.get(&market_id).unwrap();
+		let (claimable_including_fees, _) = market.get_claimable_for(account_id.to_string());
+		let market_creator_fee = claimable_including_fees * market.creator_fee_percentage / 100;
+		let resolution_fee = claimable_including_fees * market.resolution_fee_percentage / 100;
+		return claimable_including_fees - market_creator_fee - resolution_fee;
 	}
 
-	pub fn claim_creator_fee(
-		&mut self,
-		market_id: u64
-	) {
-		let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
-		let creator = market.creator.to_string();
-		assert_eq!(market.fee_claimed, false, "creator already claimed fees");
-		assert_eq!(env::predecessor_account_id(), creator.to_string(), "only creator himself can claim the fees");
-
-		let fee_payout = market.filled_volume * market.creator_fee_percentage / 100;
-		market.fee_claimed = true;
-		self.add_balance(fee_payout, creator.to_string());
-	}
 
 	pub fn claim_earnings(
 		&mut self, 
@@ -295,15 +286,29 @@ impl Markets {
 		account_id: String
 	) {
 		let market = self.active_markets.get_mut(&market_id).unwrap();
+		let market_creator = market.creator.to_string();
 		assert!(env::block_timestamp() / 1000000 >= market.end_time, "market hasn't ended yet");
 		assert_eq!(market.resoluted, true);
 		assert_eq!(market.finalized, true);
 
-		let claimable = market.get_claimable_for(account_id.to_string());
+		
+		let (claimable_including_fees, affiliates) = market.get_claimable_for(account_id.to_string());
+		let mut market_creator_fee = claimable_including_fees * market.creator_fee_percentage / 100;
+		let resolution_fee = claimable_including_fees * market.resolution_fee_percentage / 100;
+		let affiliate_fee_percentage = market.affiliate_fee_percentage;
 		market.reset_balances_for(account_id.to_string());
 		market.delete_resolution_for(account_id.to_string());
 
-		self.add_balance(claimable, account_id);
+		// TODO: pay resolutors in get_claimable
+
+		for (affiliate_account_id, amount_owed) in affiliates {
+			let affiliate_owed = amount_owed * affiliate_fee_percentage / 100;
+			market_creator_fee -= affiliate_owed;
+			self.add_balance(affiliate_owed, affiliate_account_id);
+		}
+		
+		self.add_balance(claimable_including_fees - market_creator_fee - resolution_fee, account_id);
+		self.add_balance(market_creator_fee, market_creator);
 	}
 
 	pub fn get_all_markets(

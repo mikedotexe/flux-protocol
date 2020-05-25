@@ -38,7 +38,6 @@ pub struct Market {
 	pub filled_volume: u128,
 	pub disputed: bool,
 	pub finalized: bool,
-	pub fee_claimed: bool,
 	pub creator_fee_percentage: u128,
 	pub resolution_fee_percentage: u128,
 	pub affiliate_fee_percentage: u128,
@@ -96,7 +95,6 @@ impl Market {
 			filled_volume: 0,
 			disputed: false,
 			finalized: false,
-			fee_claimed: false,
 			creator_fee_percentage,
 			resolution_fee_percentage,
 			affiliate_fee_percentage,
@@ -233,7 +231,7 @@ impl Market {
 	pub fn resolute(
 		&mut self, 
 		winning_outcome: Option<u64>, 
-		stake: u128 // should reimplement this
+		stake: u128
 	) -> u128 {
 		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false, "market is already resoluted");
@@ -365,10 +363,10 @@ impl Market {
 	pub fn get_claimable_for(
 		&self, 
 		account_id: String
-	) -> u128 {
+	) -> (u128, HashMap<String, u128>) {
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
-		
+		let mut affiliates: HashMap<String, u128> = HashMap::new();
 		// Claiming payouts
 		if invalid {
 			for (_, orderbook) in self.orderbooks.iter() {
@@ -381,13 +379,14 @@ impl Market {
 			}
 
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
-			let winning_value = winning_orderbook.calc_claimable_amt(account_id.to_string());
-			claimable += winning_value * (100-self.creator_fee_percentage)/100;
+			let (winning_value, affiliate_map) = winning_orderbook.calc_claimable_amt(account_id.to_string());
+			affiliates = affiliate_map;
+			claimable += winning_value;
 		}
 
 		// Claiming Dispute Earnings
         claimable += self.get_dispute_earnings(account_id.to_string());
-		return claimable;
+		return (claimable, affiliates);
 	}
 
 	pub fn cancel_dispute_participation(
@@ -420,6 +419,8 @@ impl Market {
         let mut user_correctly_staked = 0;
 		let mut total_correctly_staked = 0;
 		let mut total_incorrectly_staked = 0;
+
+		println!("resolution windows: {:?}", self.resolution_windows);
 		// need total staked per window
 		for window in &self.resolution_windows {
 			let empty_map = HashMap::new();

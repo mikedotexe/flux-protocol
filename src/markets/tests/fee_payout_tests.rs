@@ -24,5 +24,12 @@ fn creator_fee_test() {
 	let markets = contract.get_markets_by_id(vec![0]);
 	assert_eq!(markets[&0].filled_volume, 10 * one_dai);
 
-	
+	testing_env!(get_context(carol(), market_end_timestamp_ns()));
+	contract.resolute_market(0, Some(1), 5 * one_dai);
+	testing_env!(get_context(carol(), market_end_timestamp_ns() + 1800000000000));
+	contract.finalize_market(0, Some(1));
+
+	contract.get_claimable(0, carol());
+
+
 }
