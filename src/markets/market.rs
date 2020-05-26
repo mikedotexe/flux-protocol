@@ -421,10 +421,18 @@ impl Market {
 		let mut total_incorrectly_staked = 0;
 
 		println!("resolution windows: {:?}", self.resolution_windows);
-		// need total staked per window
+		let winning_outcome_id = self.to_numerical_outcome(self.winning_outcome);
+			
 		for window in &self.resolution_windows {
+			// Get first resolution window - if round == 0
+			// check if user participated in resolution
+
+			// check if inital resolution ends up being correct
+				// if so
+					// add market resolution fee relative to users resolution participation to their earnings as a constant
+				// if not
+					// add resolution fee to total incorrectly staked
 			let empty_map = HashMap::new();
-			let winning_outcome_id = self.to_numerical_outcome(self.winning_outcome);
 			let window_outcome_id = self.to_numerical_outcome(window.outcome);
 			let round_participation = window.participants_to_outcome_to_stake
 			.get(&account_id)

@@ -129,7 +129,6 @@ impl Markets {
 		self.subtract_balance(rounded_spend);
 	}
 
-	// TODO: Subtract liquidity
 	pub fn cancel_order(
 		&mut self, 
 		market_id: u64, 
@@ -198,7 +197,6 @@ impl Markets {
 		if market.disputed {
 			assert_eq!(env::predecessor_account_id(), self.creator, "only the judge can resolute disputed markets");
 		} else {
-			// Check that the first dispute window is closed
 			let dispute_window = market.resolution_windows.last().expect("no dispute window found, something went wrong");
 			assert!(env::block_timestamp() / 1000000 >= dispute_window.end_time || dispute_window.round == 2, "dispute window still open")
 		}
