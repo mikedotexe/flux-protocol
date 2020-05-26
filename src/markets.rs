@@ -162,7 +162,6 @@ impl Markets {
         price: u128
     ) {
 		let from = env::predecessor_account_id();
-		let balance = self.fdai_balances.get(&from).unwrap();
         ext_fungible_token::get_balance(from.to_string(), &from.to_string(), 0, SINGLE_CALL_GAS).then(
             ext::check_sufficient_balance(spend, &env::current_account_id(), 0, SINGLE_CALL_GAS)
         ).then(
@@ -300,7 +299,6 @@ impl Markets {
 	    amount: u128,
 	    account_id: String
     ) {
-	    let from = env::predecessor_account_id();
         ext_fungible_token::transfer_from(env::current_account_id(), account_id.to_string(), amount, &env::current_account_id(), 0, SINGLE_CALL_GAS).then(
             ext::update_fdai_metrics_add(amount,  &env::current_account_id(), 0, SINGLE_CALL_GAS)
         );
