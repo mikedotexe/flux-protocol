@@ -1,10 +1,10 @@
 use super::*;
-use super::utils::{init_markets_contract, ntoy, ExternalUser};
 
 #[test]
 fn test_categorical_market_automated_matcher() {
 	testing_env!(get_context(carol(), current_block_timestamp()));
 
+    // TODO: Initialize block timestamp
     let (ref mut runtime, ref root) = init_markets_contract();
 
     // Call claim_fdai, create market, place orders
@@ -40,9 +40,9 @@ fn test_categorical_market_automated_matcher() {
     let open_1_orders = accounts[1].get_open_orders(runtime, 0, 1);
     let open_2_orders = accounts[1].get_open_orders(runtime, 0, 2);
 
-    let filled_0_orders = accounts[1].get_filled_orders(0, 0);
-    let filled_1_orders = accounts[1].get_filled_orders(0, 1);
-	let filled_2_orders = accounts[1].get_filled_orders(0, 2);
+    let filled_0_orders = accounts[1].get_filled_orders(runtime, 0, 0);
+    let filled_1_orders = accounts[1].get_filled_orders(runtime, 0, 1);
+	let filled_2_orders = accounts[1].get_filled_orders(runtime, 0, 2);
 
 	//// uncomment for orderbook state check
 	// println!("open orders outcome 0: {:?}", open_0_orders);
