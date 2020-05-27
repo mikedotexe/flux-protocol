@@ -364,30 +364,31 @@ impl Market {
 	pub fn get_claimable_for(
 		&self, 
 		account_id: String
-	) -> (u128, u128, HashMap<String, u128>) {
+	) -> (u128, u128, u128, HashMap<String, u128>) {
 		let invalid = self.winning_outcome.is_none();
-		let mut claimable = 0;
+		let mut winnings = 0;
+		let mut in_open_orders = 0;
 		let mut affiliates: HashMap<String, u128> = HashMap::new();
 		// Claiming payouts
 		if invalid {
 			for (_, orderbook) in self.orderbooks.iter() {
 			    let spent = orderbook.get_spend_by(account_id.to_string());
-				claimable += spent; // market creator forfits his fee when market resolutes to invalid
+				winnings += spent; // market creator forfits his fee when market resolutes to invalid
 			}
 		} else {
 			for (_, orderbook) in self.orderbooks.iter() {
-				claimable += orderbook.get_open_order_value_for(account_id.to_string());
+				in_open_orders += orderbook.get_open_order_value_for(account_id.to_string());
 			}
 
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
 			let (winning_value, affiliate_map) = winning_orderbook.calc_claimable_amt(account_id.to_string());
 			affiliates = affiliate_map;
-			claimable += winning_value;
+			winnings += winning_value;
 		}
 
 		// Claiming Dispute Earnings
         let governance_earnings = self.get_dispute_earnings(account_id.to_string());
-		return (claimable, governance_earnings, affiliates);
+		return (winnings, in_open_orders, governance_earnings, affiliates);
 	}
 
 	pub fn cancel_dispute_participation(
@@ -433,10 +434,9 @@ impl Market {
 
 				// Check if the outcome that a resolution bond was staked on coresponds with the finalized outcome
 				if self.winning_outcome == window.outcome {
-					
 					// check if the user participated in this outcome
 					let resolution_participation = !window.participants_to_outcome_to_stake.get(&account_id).is_none();
-
+					
 					if resolution_participation {
 						// Check how much of the bond the user participated
 						let correct_outcome_participation = window.participants_to_outcome_to_stake
@@ -447,7 +447,7 @@ impl Market {
 
 						if correct_outcome_participation > &0 {
 							// calculate his relative share of the total_resolution_fee relative to his participation
-							resolution_reward += total_resolution_fee * correct_outcome_participation * 100 / window.required_bond_size / 100;
+							resolution_reward += total_resolution_fee * correct_outcome_participation * 100 / window.required_bond_size / 100 + correct_outcome_participation;
 						}
 						
 					} 

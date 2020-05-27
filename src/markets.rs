@@ -271,11 +271,10 @@ impl Markets {
 		account_id: String
 	) -> u128 {
 		let market = self.active_markets.get(&market_id).unwrap();
-		let (claimable_including_fees, governance_earnings, _) = market.get_claimable_for(account_id.to_string());
-		println!("account id: {} trading wins: {}  governance earnings: {}", account_id, claimable_including_fees, governance_earnings);
-		let market_creator_fee = claimable_including_fees * market.creator_fee_percentage / 100;
-		let resolution_fee = claimable_including_fees * market.resolution_fee_percentage / 100;
-		return claimable_including_fees - market_creator_fee - resolution_fee + governance_earnings;
+		let (winnings, left_in_open_orders, governance_earnings, _) = market.get_claimable_for(account_id.to_string());
+		let market_creator_fee = winnings * market.creator_fee_percentage / 100;
+		let resolution_fee = winnings * market.resolution_fee_percentage / 100;
+		return winnings - market_creator_fee - resolution_fee + governance_earnings + left_in_open_orders;
 	}
 
 
@@ -291,14 +290,12 @@ impl Markets {
 		assert_eq!(market.finalized, true);
 
 		
-		let (claimable_including_fees, governance_earnings, affiliates) = market.get_claimable_for(account_id.to_string());
-		let mut market_creator_fee = claimable_including_fees * market.creator_fee_percentage / 100;
-		let resolution_fee = claimable_including_fees * market.resolution_fee_percentage / 100;
+		let (winnings, left_in_open_orders, governance_earnings, affiliates) = market.get_claimable_for(account_id.to_string());
+		let mut market_creator_fee = winnings * market.creator_fee_percentage / 100;
+		let resolution_fee = winnings * market.resolution_fee_percentage / 100;
 		let affiliate_fee_percentage = market.affiliate_fee_percentage;
 		market.reset_balances_for(account_id.to_string());
 		market.delete_resolution_for(account_id.to_string());
-
-		// TODO: pay resolutors in get_claimable
 
 		for (affiliate_account_id, amount_owed) in affiliates {
 			let affiliate_owed = amount_owed * affiliate_fee_percentage / 100;
@@ -306,7 +303,7 @@ impl Markets {
 			self.add_balance(affiliate_owed, affiliate_account_id);
 		}
 		
-		self.add_balance(claimable_including_fees - market_creator_fee - resolution_fee + governance_earnings, account_id);
+		self.add_balance(winnings - market_creator_fee - resolution_fee + governance_earnings + left_in_open_orders, account_id);
 		self.add_balance(market_creator_fee, market_creator);
 	}
 

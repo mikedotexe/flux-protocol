@@ -9,7 +9,7 @@ fn init_tests() -> Markets {
 }
 
 #[test]
-fn creator_fee_test() {
+fn fee_distribution_test() {
 	let mut contract = init_tests();
 	let one_dai = to_dai(1);
 
@@ -40,9 +40,24 @@ fn creator_fee_test() {
 
 	assert_eq!(expected_creator_fee, claimable_creator);
 
-	// let creator_balance_before_claim = contract.get_fdai_balance(alice());
+	let creator_balance_before_claim = contract.get_fdai_balance(carol());
+	let resolutor_balance_before_claim = contract.get_fdai_balance(bob());
+	let trader_balance_before_claim = contract.get_fdai_balance(alice());
 	let claimable_trader = contract.get_claimable(0, alice());
-	let expected_claimable_trader = 20 * one_dai + (20 * one_dai - (market.resolution_fee_percentage * 10 * one_dai / 100) - (market.creator_fee_percentage * 10 * one_dai / 100));
-	assert_eq!(claimable_trader, expected_claimable_trader);
+	let expected_claimable_trader_excl_fees = 30 * one_dai;
+	let fees = 10 * one_dai * market.resolution_fee_percentage / 100 + 10 * one_dai * market.creator_fee_percentage / 100;
+
+	contract.claim_earnings(0, alice());
+	contract.claim_earnings(0, bob());
+	let creator_balance_after_claim = contract.get_fdai_balance(carol());
+	let resolutor_balance_after_claim = contract.get_fdai_balance(bob());
+	let trader_balance_after_claim = contract.get_fdai_balance(alice());
+
+	
+	let market = contract.get_markets_by_id(vec![0])[&0];
+	assert_eq!(creator_balance_after_claim, creator_balance_before_claim + 10 * one_dai * market.creator_fee_percentage / 100);
+	assert_eq!(resolutor_balance_after_claim, resolutor_balance_before_claim + 10 * one_dai * market.resolution_fee_percentage / 100 + 5 * one_dai);
+	assert_eq!(trader_balance_after_claim, trader_balance_before_claim + claimable_trader);
+
 
 }
