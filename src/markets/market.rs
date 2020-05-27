@@ -416,47 +416,73 @@ impl Market {
 		&self, 
 		account_id: String
 	) -> u128 {
-        let mut user_correctly_staked = 0;
+		let mut user_correctly_staked = 0;
+		let mut resolution_reward = 0;
 		let mut total_correctly_staked = 0;
 		let mut total_incorrectly_staked = 0;
 
-		println!("resolution windows: {:?}", self.resolution_windows);
 		let winning_outcome_id = self.to_numerical_outcome(self.winning_outcome);
 			
 		for window in &self.resolution_windows {
-			// Get first resolution window - if round == 0
-			// check if user participated in resolution
+			// check if round - round 0 - which is the resolution round
+			if window.round == 0 {
 
-			// check if inital resolution ends up being correct
-				// if so
-					// add market resolution fee relative to users resolution participation to their earnings as a constant
-				// if not
-					// add resolution fee to total incorrectly staked
-			let empty_map = HashMap::new();
-			let window_outcome_id = self.to_numerical_outcome(window.outcome);
-			let round_participation = window.participants_to_outcome_to_stake
-			.get(&account_id)
-			.unwrap_or(&empty_map)
-			.get(&winning_outcome_id)
-			.unwrap_or(&0);
-			
-			let correct_stake = window.staked_per_outcome
-			.get(&winning_outcome_id)
-			.unwrap_or(&0);
+				// Calculate how much the total fee payout will be 
+				let total_resolution_fee = self.resolution_fee_percentage * self.filled_volume / 100;
+
+				// Check if the outcome that a resolution bond was staked on coresponds with the finalized outcome
+				if self.winning_outcome == window.outcome {
+					
+					// check if the user participated in this outcome
+					let resolution_participation = !window.participants_to_outcome_to_stake.get(&account_id).is_none();
+
+					if resolution_participation {
+						// Check how much of the bond the user participated
+						let correct_outcome_participation = window.participants_to_outcome_to_stake
+						.get(&account_id)
+						.unwrap()
+						.get(&self.winning_outcome.unwrap())
+						.unwrap_or(&0);
+
+						if correct_outcome_participation > &0 {
+							// calculate his relative share of the total_resolution_fee relative to his participation
+							resolution_reward += total_resolution_fee * correct_outcome_participation * 100 / window.required_bond_size / 100;
+						}
+						
+					} 
+				} else {
+					// If the initial resolution bond wasn't staked on the correct outcome, devide the resolution fee amongst disputors
+					total_correctly_staked += total_resolution_fee;
+				}
+			} else {
+				// If it isn't the first round calculate according to escalation game
+				let empty_map = HashMap::new();
+				let window_outcome_id = self.to_numerical_outcome(window.outcome);
+				let round_participation = window.participants_to_outcome_to_stake
+				.get(&account_id)
+				.unwrap_or(&empty_map)
+				.get(&winning_outcome_id)
+				.unwrap_or(&0);
+				
+				let correct_stake = window.staked_per_outcome
+				.get(&winning_outcome_id)
+				.unwrap_or(&0);
 
 
-			let incorrect_stake = window.staked_per_outcome
-			.get(&window_outcome_id)
-			.unwrap_or(&0);
+				let incorrect_stake = window.staked_per_outcome
+				.get(&window_outcome_id)
+				.unwrap_or(&0);
 
-			user_correctly_staked += round_participation;
-			total_correctly_staked += correct_stake;
-			total_incorrectly_staked += incorrect_stake;
+				user_correctly_staked += round_participation;
+				total_correctly_staked += correct_stake;
+				total_incorrectly_staked += incorrect_stake;
+
+			}
 		}
 
-		if total_correctly_staked == 0 {return 0}
+		if total_correctly_staked == 0 {return resolution_reward}
 
-        return user_correctly_staked * 100 / total_correctly_staked * total_incorrectly_staked / 100;
+        return user_correctly_staked * 100 / total_correctly_staked * total_incorrectly_staked / 100 + resolution_reward;
 	}
 
     // Updates the best price for an order once initial best price is filled
