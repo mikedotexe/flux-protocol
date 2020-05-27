@@ -35,12 +35,12 @@ pub struct Market {
 	pub winning_outcome: Option<u64>, // invalid has outcome id: self.outcomes
 	pub resoluted: bool,
 	pub resolute_bond: u128,
-	pub liquidity: u128,
+	pub filled_volume: u128,
 	pub disputed: bool,
 	pub finalized: bool,
-	pub fee_claimed: bool,
-	pub fee_percentage: u128,
-	pub cost_percentage: u128,
+	pub creator_fee_percentage: u128,
+	pub resolution_fee_percentage: u128,
+	pub affiliate_fee_percentage: u128,
 	pub api_source: String,
 	pub resolution_windows: Vec<ResolutionWindow>
 }
@@ -56,8 +56,9 @@ impl Market {
 		outcome_tags: Vec<String>, 
 		categories: Vec<String>, 
 		end_time: u64, 
-		fee_percentage: u128, 
-		cost_percentage: u128, 
+		creator_fee_percentage: u128, 
+		resolution_fee_percentage: u128, 
+		affiliate_fee_percentage: u128,
 		api_source: String
 	) -> Self {
 		let mut empty_orderbooks = BTreeMap::new();
@@ -91,12 +92,12 @@ impl Market {
 			winning_outcome: None,
 			resoluted: false,
 			resolute_bond: 5 * base.pow(17),
-			liquidity: 0,
+			filled_volume: 0,
 			disputed: false,
 			finalized: false,
-			fee_claimed: false,
-			fee_percentage,
-			cost_percentage,
+			creator_fee_percentage,
+			resolution_fee_percentage,
+			affiliate_fee_percentage,
 			api_source,
 			resolution_windows: vec![base_resolution_window]
 		}
@@ -108,7 +109,8 @@ impl Market {
 		outcome: u64, 
 		amt_of_shares: u128, 
 		spend: u128, 
-		price: u128
+		price: u128,
+		affiliate_account_id: Option<String>
 	) {
 		assert!(spend > 0);
 		assert!(price > 0 && price < 100);
@@ -116,10 +118,9 @@ impl Market {
 		assert!(env::block_timestamp() / 1000000 < self.end_time);
 		let (spend_left, shares_filled) = self.fill_matches(outcome, spend, price);
 		let total_spend = spend - spend_left;
-		self.liquidity += shares_filled * 100;
-		let shares_filled = shares_filled;
+		self.filled_volume += shares_filled * 100;
 		let orderbook = self.orderbooks.get_mut(&outcome).unwrap();
-		orderbook.place_order(account_id, outcome, spend, amt_of_shares, price, total_spend, shares_filled);
+		orderbook.place_order(account_id, outcome, spend, amt_of_shares, price, total_spend, shares_filled, affiliate_account_id);
 	}
 
 	fn fill_matches(
@@ -230,7 +231,7 @@ impl Market {
 	pub fn resolute(
 		&mut self, 
 		winning_outcome: Option<u64>, 
-		stake: u128 // should reimplement this
+		stake: u128
 	) -> u128 {
 		assert!(env::block_timestamp() / 1000000 >= self.end_time, "market hasn't ended yet");
 		assert_eq!(self.resoluted, false, "market is already resoluted");
@@ -273,8 +274,6 @@ impl Market {
 			};
 			self.resolution_windows.push(new_resolution_window);
 		} 
-
-
 
 		return to_return;
 	}
@@ -361,32 +360,35 @@ impl Market {
 	    self.finalized = true;
 	}
 
+	// TODO: claimable should probably be renamed to something like: dispute earnings
 	pub fn get_claimable_for(
 		&self, 
 		account_id: String
-	) -> u128 {
+	) -> (u128, u128, u128, HashMap<String, u128>) {
 		let invalid = self.winning_outcome.is_none();
-		let mut claimable = 0;
-		
+		let mut winnings = 0;
+		let mut in_open_orders = 0;
+		let mut affiliates: HashMap<String, u128> = HashMap::new();
 		// Claiming payouts
 		if invalid {
 			for (_, orderbook) in self.orderbooks.iter() {
 			    let spent = orderbook.get_spend_by(account_id.to_string());
-				claimable += spent; // market creator forfits his fee when market resolutes to invalid
+				winnings += spent; // market creator forfits his fee when market resolutes to invalid
 			}
 		} else {
 			for (_, orderbook) in self.orderbooks.iter() {
-				claimable += orderbook.get_open_order_value_for(account_id.to_string());
+				in_open_orders += orderbook.get_open_order_value_for(account_id.to_string());
 			}
 
 			let winning_orderbook = self.orderbooks.get(&self.winning_outcome.unwrap()).unwrap();
-			let winning_value = winning_orderbook.calc_claimable_amt(account_id.to_string());
-			claimable += winning_value * (100-self.fee_percentage)/100;
+			let (winning_value, affiliate_map) = winning_orderbook.calc_claimable_amt(account_id.to_string());
+			affiliates = affiliate_map;
+			winnings += winning_value;
 		}
 
 		// Claiming Dispute Earnings
-        claimable += self.get_dispute_earnings(account_id.to_string());
-		return claimable;
+        let governance_earnings = self.get_dispute_earnings(account_id.to_string());
+		return (winnings, in_open_orders, governance_earnings, affiliates);
 	}
 
 	pub fn cancel_dispute_participation(
@@ -416,37 +418,72 @@ impl Market {
 		&self, 
 		account_id: String
 	) -> u128 {
-        let mut user_correctly_staked = 0;
+		let mut user_correctly_staked = 0;
+		let mut resolution_reward = 0;
 		let mut total_correctly_staked = 0;
 		let mut total_incorrectly_staked = 0;
-		// need total staked per window
-		for window in &self.resolution_windows {
-			let empty_map = HashMap::new();
-			let winning_outcome_id = self.to_numerical_outcome(self.winning_outcome);
-			let window_outcome_id = self.to_numerical_outcome(window.outcome);
-			let round_participation = window.participants_to_outcome_to_stake
-			.get(&account_id)
-			.unwrap_or(&empty_map)
-			.get(&winning_outcome_id)
-			.unwrap_or(&0);
+
+		let winning_outcome_id = self.to_numerical_outcome(self.winning_outcome);
 			
-			let correct_stake = window.staked_per_outcome
-			.get(&winning_outcome_id)
-			.unwrap_or(&0);
+		for window in &self.resolution_windows {
+			// check if round - round 0 - which is the resolution round
+			if window.round == 0 {
+
+				// Calculate how much the total fee payout will be 
+				let total_resolution_fee = self.resolution_fee_percentage * self.filled_volume / 100;
+
+				// Check if the outcome that a resolution bond was staked on coresponds with the finalized outcome
+				if self.winning_outcome == window.outcome {
+					// check if the user participated in this outcome
+					let resolution_participation = !window.participants_to_outcome_to_stake.get(&account_id).is_none();
+					
+					if resolution_participation {
+						// Check how much of the bond the user participated
+						let correct_outcome_participation = window.participants_to_outcome_to_stake
+						.get(&account_id)
+						.unwrap()
+						.get(&self.winning_outcome.unwrap())
+						.unwrap_or(&0);
+
+						if correct_outcome_participation > &0 {
+							// calculate his relative share of the total_resolution_fee relative to his participation
+							resolution_reward += total_resolution_fee * correct_outcome_participation * 100 / window.required_bond_size / 100 + correct_outcome_participation;
+						}
+						
+					} 
+				} else {
+					// If the initial resolution bond wasn't staked on the correct outcome, devide the resolution fee amongst disputors
+					total_correctly_staked += total_resolution_fee;
+				}
+			} else {
+				// If it isn't the first round calculate according to escalation game
+				let empty_map = HashMap::new();
+				let window_outcome_id = self.to_numerical_outcome(window.outcome);
+				let round_participation = window.participants_to_outcome_to_stake
+				.get(&account_id)
+				.unwrap_or(&empty_map)
+				.get(&winning_outcome_id)
+				.unwrap_or(&0);
+				
+				let correct_stake = window.staked_per_outcome
+				.get(&winning_outcome_id)
+				.unwrap_or(&0);
 
 
-			let incorrect_stake = window.staked_per_outcome
-			.get(&window_outcome_id)
-			.unwrap_or(&0);
+				let incorrect_stake = window.staked_per_outcome
+				.get(&window_outcome_id)
+				.unwrap_or(&0);
 
-			user_correctly_staked += round_participation;
-			total_correctly_staked += correct_stake;
-			total_incorrectly_staked += incorrect_stake;
+				user_correctly_staked += round_participation;
+				total_correctly_staked += correct_stake;
+				total_incorrectly_staked += incorrect_stake;
+
+			}
 		}
 
-		if total_correctly_staked == 0 {return 0}
+		if total_correctly_staked == 0 {return resolution_reward}
 
-        return user_correctly_staked * 100 / total_correctly_staked * total_incorrectly_staked / 100;
+        return user_correctly_staked * 100 / total_correctly_staked * total_incorrectly_staked / 100 + resolution_reward;
 	}
 
     // Updates the best price for an order once initial best price is filled
@@ -579,36 +616,6 @@ impl Market {
 				*staked = 0
 			})
 			.or_insert(0);
-		}
-	}
-
-}
-
-impl Default for Market {
-	fn default() -> Self {
-		Self {
-			id: 0,
-			description: "".to_string(),
-			extra_info: "".to_string(),
-			creator: "".to_string(),
-			outcomes: 0,
-			outcome_tags: vec![],
-			categories: vec![],
-			last_price_for_outcomes: HashMap::new(),
-			creation_time: 0,
-			end_time: 0,
-			orderbooks: BTreeMap::new(),
-			winning_outcome: None,
-			resoluted: false,
-			resolute_bond: 0,
-			liquidity: 0,
-			disputed: false,
-			finalized: false,
-			fee_claimed: false,
-			fee_percentage: 0,
-			cost_percentage: 0,
-			api_source: "".to_string(),
-			resolution_windows: vec![]
 		}
 	}
 }
