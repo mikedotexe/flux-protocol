@@ -69,7 +69,7 @@ impl Orderbook {
 
         // If all of spend is filled, state order is fully filled
 		let left_to_spend = spend - filled;
-		println!("lts {:?}", new_order);
+
 		if left_to_spend < 100 {
 			self.filled_orders.insert(order_id, new_order);
 			return;
