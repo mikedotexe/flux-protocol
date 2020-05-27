@@ -66,13 +66,16 @@ impl Orderbook {
 		let order_id = self.new_order_id();
 		let new_order = Order::new(account_id.to_string(), outcome, order_id, spend, amt_of_shares, price, filled, shares_filled, affiliate_account_id);
 		*self.spend_by_user.entry(account_id.to_string()).or_insert(0) += spend;
+		self.orders_by_user.entry(account_id.to_string()).or_insert(Vec::new()).push(order_id);
 
         // If all of spend is filled, state order is fully filled
 		let left_to_spend = spend - filled;
+
 		if left_to_spend < 100 {
-			self.filled_orders.insert(price, new_order);
+			self.filled_orders.insert(order_id, new_order);
 			return;
 		}
+
 
         // If there is a remaining order, set this new order as the new market rate
 		self.set_best_price(price);
@@ -85,8 +88,6 @@ impl Orderbook {
 		*self.liquidity_by_price.entry(price).or_insert(0) += left_to_spend;
 
 		orders_at_price.insert(order_id, true);
-
-		self.orders_by_user.entry(account_id.to_string()).or_insert(Vec::new()).push(order_id);
 	}
 
     // Updates current market order price
