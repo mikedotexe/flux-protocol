@@ -360,10 +360,11 @@ impl Market {
 	    self.finalized = true;
 	}
 
+	// TODO: claimable should probably be renamed to something like: dispute earnings
 	pub fn get_claimable_for(
 		&self, 
 		account_id: String
-	) -> (u128, HashMap<String, u128>) {
+	) -> (u128, u128, HashMap<String, u128>) {
 		let invalid = self.winning_outcome.is_none();
 		let mut claimable = 0;
 		let mut affiliates: HashMap<String, u128> = HashMap::new();
@@ -385,8 +386,8 @@ impl Market {
 		}
 
 		// Claiming Dispute Earnings
-        claimable += self.get_dispute_earnings(account_id.to_string());
-		return (claimable, affiliates);
+        let governance_earnings = self.get_dispute_earnings(account_id.to_string());
+		return (claimable, governance_earnings, affiliates);
 	}
 
 	pub fn cancel_dispute_participation(
