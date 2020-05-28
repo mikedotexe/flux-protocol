@@ -1,8 +1,9 @@
 use super::*;
+use crate::markets::tests::utils::{init_markets_contract, ExternalUser, ntoy};
 
 #[test]
 fn test_categorical_market_automated_matcher() {
-	testing_env!(get_context(carol(), current_block_timestamp()));
+	//testing_env!(get_context(carol(), current_block_timestamp()));
 
     // TODO: Initialize block timestamp
     let (ref mut runtime, ref root) = init_markets_contract();
@@ -19,6 +20,8 @@ fn test_categorical_market_automated_matcher() {
         };
         accounts.push(acc);
     }
+
+    accounts[0].token_init_new(runtime, accounts[0].get_account_id().to_string(), 10000000000000000).unwrap();
 
     // Call claim_fdai, create market
     accounts[0].claim_fdai(runtime).unwrap();
