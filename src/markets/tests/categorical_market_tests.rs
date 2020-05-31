@@ -25,6 +25,9 @@ fn test_categorical_market_automated_matcher() {
 
     // Call claim_fdai, create market
     accounts[0].claim_fdai(runtime).unwrap();
+
+    accounts[0].get_fdai_metrics(runtime);
+
     accounts[0].create_market(runtime, "Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(),  market_end_timestamp_ms(), 0, 0, "test".to_string()).unwrap();
 
     // best prices - market price = 10

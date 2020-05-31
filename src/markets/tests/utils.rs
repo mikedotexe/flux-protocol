@@ -60,7 +60,7 @@ impl ExternalUser {
         let res = runtime.resolve_tx(tx).unwrap();
         runtime.process_all().unwrap();
         let ans = outcome_into_result(res);
-        println!("{:?}", ans);
+        //println!("{:?}", ans);
         return ans;
     }
 
@@ -81,8 +81,8 @@ impl ExternalUser {
         let res = runtime.resolve_tx(tx).unwrap();
         runtime.process_all().unwrap();
         let ans = outcome_into_result(res);
-        println!("token contract deploying");
-        println!("{:?}", ans);
+        //println!("token contract deploying");
+        //println!("{:?}", ans);
         return ans;
     }
 
@@ -151,9 +151,10 @@ impl ExternalUser {
             .function_call("create_market".into(), args, 10000000000000000, 0)
             .sign(&self.signer);
         let res = runtime.resolve_tx(tx).unwrap();
-        println!("{:?}", res);
         runtime.process_all().unwrap();
-        outcome_into_result(res)
+        let ans = outcome_into_result(res);
+        //println!("{:?}", ans);
+        return ans;
     }
 
     pub fn place_order(
@@ -178,7 +179,7 @@ impl ExternalUser {
             .function_call("place_order".into(), args, 10000000000000000, 0)
             .sign(&self.signer);
         let res = runtime.resolve_tx(tx).unwrap();
-        println!("{:?}", res);
+        //println!("{:?}", res);
         runtime.process_all().unwrap();
         outcome_into_result(res)
     }
@@ -220,6 +221,27 @@ impl ExternalUser {
         return filled_orders_map;
         //&HashMap<&u128, Order>::from(serde_json::from_slice::HashMap<u128, Order>(filled_orders.as_slice()).unwrap())
     }
+
+    pub fn get_fdai_metrics(&self, runtime: &RuntimeStandalone) -> u128 {
+            // TODO: SPECIFY WHAT ACCOUNT TO CALL TO
+            let fdai_metrics = runtime
+                .view_method_call(
+                    &("flux-tests".to_string()),
+                    "get_fdai_metrics",
+                    json!({})
+                        .to_string()
+                        .as_bytes(),
+                )
+                .unwrap()
+                .0;
+
+            //TODO: UPDATE THIS CASTING
+            let data: Vec<serde_json::Value> = serde_json::from_slice(fdai_metrics.as_slice()).unwrap();
+            println!("{:?}", data);
+            let fdai_metrics_vec: Vec<(u128, u128, u128, u64)> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
+            println!("{:?}", fdai_metrics_vec);
+            return 1;
+        }
 
     pub fn create_external(
         &self,

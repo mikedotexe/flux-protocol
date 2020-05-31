@@ -83,6 +83,7 @@ impl Markets {
 
 	#[callback_vec(amount)]
     pub fn check_not_claimed(&mut self, amount: u128) -> Result<bool, String> {
+        println!("{:?}", amount);
         if amount != 0 {
             return Ok(amount != 0);
         } else {
@@ -92,6 +93,7 @@ impl Markets {
 
     #[callback_vec(check_result)]
     pub fn grant_fdai(&mut self, from: String, check_result: Result<bool, String>) {
+        println!("{:?}", check_result);
         if let Ok(true) = check_result {
             let claim_amount = 100 * self.dai_token();
             ext_fungible_token::transfer_from(env::current_account_id(), from, claim_amount, &env::current_account_id(), 0, SINGLE_CALL_GAS);
@@ -171,6 +173,7 @@ impl Markets {
 
     #[callback_vec(amount)]
     pub fn check_sufficient_balance(&mut self, spend: u128, amount: u128) -> Result<bool, String> {
+        println!("{:?}", spend);
         if amount >= spend {
             return Ok(amount >= spend);
         } else {
