@@ -2,6 +2,7 @@ use near_sdk::{near_bindgen, env, ext_contract, Promise, callback_vec, callback}
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::collections::{BTreeMap, HashMap};
 use serde::{Deserialize, Serialize};
+use near_sdk::json_types::U128;
 
 mod market;
 type Market = market::Market;
@@ -38,7 +39,7 @@ pub trait ExtFungibleToken {
 
 #[ext_contract(ext)]
 pub trait ExtContract {
-    fn check_not_claimed(&mut self);
+    fn check_not_claimed(&mut self) -> bool;
     fn grant_fdai(&mut self, from: String);
     fn check_sufficient_balance(&mut self, spend: u128);
     fn update_fdai_metrics_claim(&mut self);
@@ -72,20 +73,22 @@ impl Markets {
 	    &mut self
     ) -> Promise {
 		let from = env::predecessor_account_id();
-		ext_fungible_token::get_balance(from.to_string(), &from.to_string(), 0, SINGLE_CALL_GAS).then(
-		    ext::check_not_claimed(&env::current_account_id(), 0, SINGLE_CALL_GAS)
-        ).then(
-		    ext::grant_fdai(from.to_string(), &env::current_account_id(), 0, SINGLE_CALL_GAS)
-		).then(
-		    ext::update_fdai_metrics_claim(&env::current_account_id(), 0, SINGLE_CALL_GAS)
+		ext_fungible_token::get_balance(from.to_string(), &from.to_string(), 0, SINGLE_CALL_GAS * 3)
+		.then(
+		    ext::check_not_claimed(&env::current_account_id(), 0, SINGLE_CALL_GAS * 3)
+        )
+		.then(
+		    ext::grant_fdai(from.to_string(), &env::current_account_id(), 0, SINGLE_CALL_GAS * 3)
+		)
+		.then(
+		    ext::update_fdai_metrics_claim(&env::current_account_id(), 0, SINGLE_CALL_GAS * 3)
 		)
 	}
 
-    pub fn check_not_claimed(&mut self, #[callback] amount: u128) -> Result<bool, String> {
-        println!("debug check_not_claimed {:?}", amount);
+    pub fn check_not_claimed(&mut self, #[callback] amount: U128) -> Result<bool, String> {
         env::log(format!("debug check_not_claimed {:?}", amount).as_bytes());
-        if amount != 0 {
-            return Ok(amount != 0);
+        if amount.0 != 0 {
+            return Ok(amount.0 != 0);
         } else {
             return Err("user has already claimed fdai".to_string());
         }

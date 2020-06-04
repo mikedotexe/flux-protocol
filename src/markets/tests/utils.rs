@@ -13,6 +13,8 @@ use near_primitives::{
 use std::collections::{HashMap};
 
 use serde_json::json;
+use near_sdk::json_types::U128;
+
 type TxResult = Result<ExecutionOutcome, ExecutionOutcome>;
 
 lazy_static::lazy_static! {
@@ -64,25 +66,23 @@ impl ExternalUser {
         return ans;
     }
 
-    pub fn token_init_new(&self, runtime: &mut RuntimeStandalone, from: String, amount: u64) -> TxResult {
+    pub fn token_deploy_call_new(&self, runtime: &mut RuntimeStandalone, account: String, total_supply: U128) -> TxResult {
+        // let args = json!({}).to_string().as_bytes().to_vec();
         let args = json!({
-            "from": from,
-            "amount": amount,
-        })
-            .to_string()
-            .as_bytes()
-            .to_vec();
+            "owner_id": account,
+            "total_supply": total_supply
+        }).to_string().as_bytes().to_vec();
 
         let tx = self
-            .new_tx(runtime, "flux-tests".to_string())
-            .function_call("deploy_fungible_token".into(), args, 10000000000000000, 0)
+            .new_tx(runtime, account)
+            // .create_account()
+            // .transfer(99994508400000000000000000)
+            .deploy_contract(FUNGIBLE_TOKEN_BYTES.to_vec())
+            .function_call("new".into(), args, 10000000000000000, 0)
             .sign(&self.signer);
-
         let res = runtime.resolve_tx(tx).unwrap();
         runtime.process_all().unwrap();
         let ans = outcome_into_result(res);
-        //println!("token contract deploying");
-        //println!("{:?}", ans);
         return ans;
     }
 

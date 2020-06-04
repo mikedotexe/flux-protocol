@@ -1,5 +1,6 @@
 use super::*;
 use crate::markets::tests::utils::{init_markets_contract, ExternalUser, ntoy};
+use near_sdk::json_types::U128;
 
 #[test]
 fn test_categorical_market_automated_matcher() {
@@ -21,10 +22,10 @@ fn test_categorical_market_automated_matcher() {
         accounts.push(acc);
     }
 
-    accounts[0].token_init_new(runtime, accounts[0].get_account_id().to_string(), 10000000000000000).unwrap();
+    accounts[0].token_deploy_call_new(runtime, accounts[0].get_account_id().to_string(),  U128(10000000000000000)).unwrap();
 
     // Call claim_fdai, create market
-    println!("debug {:#?}", accounts[0].claim_fdai(runtime).unwrap());
+    println!("debug accounts[0] {:#?}", accounts[0].claim_fdai(runtime).unwrap());
 
     accounts[0].get_fdai_metrics(runtime);
 
@@ -39,7 +40,7 @@ fn test_categorical_market_automated_matcher() {
     accounts[0].place_order(runtime, 0, 1, 5000, 50);
 
     // alice fills all orders
-    accounts[1].claim_fdai(runtime).unwrap();
+    println!("debug accounts[1] {:#?}", accounts[1].claim_fdai(runtime).unwrap());
     accounts[1].place_order(runtime, 0, 2, 3500, 25);
 
     let open_0_orders = accounts[1].get_open_orders(runtime, 0, 0);
