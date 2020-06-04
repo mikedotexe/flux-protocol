@@ -24,7 +24,7 @@ fn test_categorical_market_automated_matcher() {
     accounts[0].token_init_new(runtime, accounts[0].get_account_id().to_string(), 10000000000000000).unwrap();
 
     // Call claim_fdai, create market
-    accounts[0].claim_fdai(runtime).unwrap();
+    println!("debug {:#?}", accounts[0].claim_fdai(runtime).unwrap());
 
     accounts[0].get_fdai_metrics(runtime);
 

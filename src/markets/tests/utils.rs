@@ -239,7 +239,7 @@ impl ExternalUser {
             let data: Vec<serde_json::Value> = serde_json::from_slice(fdai_metrics.as_slice()).unwrap();
             println!("{:?}", data);
             // let fdai_metrics_vec: Vec<(u128, u128, u128, u64)> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
-            let fdai_metrics_vec: Vec<u8> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
+            let fdai_metrics_vec: Vec<u128> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
             println!("{:?}", fdai_metrics_vec);
             return 1;
         }
