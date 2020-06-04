@@ -1,8 +1,8 @@
-use near_sdk::{near_bindgen, env, ext_contract, Promise, callback_vec, callback};
+use near_sdk::{AccountId, near_bindgen, env, ext_contract, Promise, callback_vec, callback, PromiseOrValue};
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::collections::{BTreeMap, HashMap};
 use serde::{Deserialize, Serialize};
-
+use serde_json::json;
 mod market;
 type Market = market::Market;
 type Order = market::orderbook::order::Order;
@@ -36,7 +36,7 @@ pub trait ExtFungibleToken {
     fn get_balance(&self, owner_id: AccountId) -> u128;
 }
 
-#[ext_contract(ext)]
+#[ext_contract(ext_maybe)]
 pub trait ExtContract {
     fn check_not_claimed(&mut self);
     fn grant_fdai(&mut self, from: String);
@@ -46,10 +46,28 @@ pub trait ExtContract {
     fn update_fdai_metrics_add(&mut self, amount: u128);
     fn purchase_shares(&mut self, from: String, market_id: u64, outcome: u64, spend: u128, price: u128);
     fn resolute_approved(&mut self, market_id: u64, winning_outcome: Option<u64>, stake: u128);
+	fn hardcoded01(&self) -> u8;
+	fn hardcoded02(&self, #[callback] passed_in: u8);
 }
 
 #[near_bindgen]
 impl Markets {
+	#[init]
+	pub fn new() -> Self {
+		Self {
+			creator: "flux-dev".to_string(),
+			active_markets: BTreeMap::new(),
+			nonce: 0,
+			fdai_balances: HashMap::new(),
+			fdai_circulation: 0,
+			fdai_in_protocol: 0,
+			fdai_outside_escrow: 0,
+			user_count: 0,
+			max_fee_percentage: 5,
+			creation_bond: 0,
+		}
+	}
+
     pub fn deploy_fungible_token(&self, from: String, amount: u64) {
         Promise::new(from)
             .create_account()
@@ -71,19 +89,113 @@ impl Markets {
 	pub fn claim_fdai(
 	    &mut self
     ) {
+		// will not print
 		let from = env::predecessor_account_id();
-		ext_fungible_token::get_balance(from.to_string(), &from.to_string(), 0, SINGLE_CALL_GAS).then(
-		    ext::check_not_claimed(&env::current_account_id(), 0, SINGLE_CALL_GAS)
-        ).then(
-		    ext::grant_fdai(from.to_string(), &env::current_account_id(), 0, SINGLE_CALL_GAS)
+		println!("aloha top of claim_fdai in markets. from: {}", from);
+		env::log(format!("aloha top of claim_fdai in markets: {}", from).as_bytes());
+		// ext_fungible_token::get_balance(from.to_string(), &from.to_string(), 0, SINGLE_CALL_GAS).then(
+		    ext_maybe::check_not_claimed(&env::current_account_id(), 0, SINGLE_CALL_GAS)
+		// )
+        .then(
+		    ext_maybe::grant_fdai(from.to_string(), &env::current_account_id(), 0, SINGLE_CALL_GAS)
 		).then(
-		    ext::update_fdai_metrics(&env::current_account_id(), 0, SINGLE_CALL_GAS)
+		    ext_maybe::update_fdai_metrics(&env::current_account_id(), 0, SINGLE_CALL_GAS)
 		);
 	}
 
-	#[callback_vec(amount)]
-    pub fn check_not_claimed(&mut self, amount: u128) -> Result<bool, String> {
-        println!("{:?}", amount);
+	pub fn hardcode_test(&mut self) -> Promise {
+	// pub fn hardcode_test(&mut self) {
+		println!("aloha hardcode_test");
+		ext_maybe::hardcoded01(&env::current_account_id(), 0, SINGLE_CALL_GAS)
+		.then(
+			ext_maybe::hardcoded02(&env::current_account_id(), 0, SINGLE_CALL_GAS)
+		)
+	}
+
+	// pub fn hardcoded01(&mut self) -> PromiseOrValue<u8> {
+	pub fn hardcoded01(&self) -> u8 {
+		println!("aloha hardcoded01");
+		env::log(b"aloha hrm");
+		// PromiseOrValue::Value(19)
+		3
+	}
+
+	// pub fn hardcoded02(&mut self, #[callback] passed_in: u8) -> PromiseOrValue<u8> {
+	// pub fn hardcoded02(&self, #[callback] passed_in: u8) -> u8 {
+	pub fn hardcoded02(&self, #[callback] passed_in: u8) -> PromiseOrValue<u8> {
+		println!("aloha hardcoded01, passed_in: {}", passed_in);
+		PromiseOrValue::Value(1 + passed_in)
+		// 1 + passed_in
+	}
+
+	// pub fn claim_fdai_new(&mut self) -> Promise {
+	// 	env::log(b"aloha top of claim_fdai (new) in markets.");
+	// 	println!("alohaz top of claim_fdai_new");
+	// 	// let promise_transfer_tokens = env::promise_create(
+	// 	// 	"account_0".to_string(),
+	// 	// 	b"get_balance",
+	// 	// 	json!({
+    //     //         "owner_id": env::predecessor_account_id(),
+    //     //     }).to_string().as_bytes(),
+	// 	// 	0,
+	// 	// 	SINGLE_CALL_GAS,
+	// 	// );
+	//
+	// 	// let promise_call_self_request = env::promise_then(
+	// 	// 	promise_transfer_tokens,
+	// 	// 	env::current_account_id(),
+	// 	// 	b"store_request",
+	// 	// 	json!({
+    //     //         "sender": env::predecessor_account_id(),
+    //     //         "payment": payment,
+    //     //         "spec_id": spec_id,
+    //     //         "callback_address": callback_address,
+    //     //         "callback_method": callback_method,
+    //     //         "nonce": nonce,
+    //     //         "data_version": data_version,
+    //     //         "data": data
+    //     //     }).to_string().as_bytes(),
+	// 	// 	0,
+	// 	// 	SINGLE_CALL_GAS * 3
+	// 	// );
+	//
+	// 	// let promise_call_self_request = env::promise_then(
+	// 	// 	promise_transfer_tokens,
+	// 	// 	env::current_account_id(),
+	// 	// 	b"check_not_claimed",
+	// 	// 	json!({
+    //     //         "amount": 19
+    //     //     }).to_string().as_bytes(),
+	// 	// 	0,
+	// 	// 	SINGLE_CALL_GAS * 3
+	// 	// );
+	//
+	// 	let promise_transfer_tokens = env::promise_create(
+	// 		env::current_account_id(),
+	// 		b"check_not_claimed",
+	// 		json!({
+    //             "amount": 19
+    //         }).to_string().as_bytes(),
+	// 		0,
+	// 		SINGLE_CALL_GAS,
+	// 	);
+	//
+	// 	let promise_call_self_request = env::promise_then(
+	// 		promise_transfer_tokens,
+	// 		env::current_account_id(),
+	// 		b"check_not_claimed",
+	// 		json!({
+    //             "amount": 19
+    //         }).to_string().as_bytes(),
+	// 		0,
+	// 		SINGLE_CALL_GAS * 3
+	// 	);
+	//
+	// 	env::promise_return(promise_call_self_request);
+	// }
+	// #[callback_vec(amount)]
+    pub fn check_not_claimed(&mut self, #[callback] amount: u128) -> Result<bool, String> {
+        env::log(b"aloha top of check_not_claimed");
         if amount != 0 {
             return Ok(amount != 0);
         } else {
@@ -91,8 +203,9 @@ impl Markets {
         }
     }
 
-    #[callback_vec(check_result)]
+    // #[callback_vec(check_result)]
     pub fn grant_fdai(&mut self, from: String, check_result: Result<bool, String>) {
+		env::log(b"aloha top of grant_fdai");
         println!("{:?}", check_result);
         if let Ok(true) = check_result {
             let claim_amount = 100 * self.dai_token();
@@ -100,8 +213,9 @@ impl Markets {
         }
     }
 
-    #[callback]
+    // #[callback]
     pub fn update_fdai_metrics_claim(&mut self) {
+		env::log(b"aloha top of update_fdai_metrics_claim");
         // TODO: Determine if above call was a success
         let claim_amount = 100 * self.dai_token();
         self.fdai_circulation = self.fdai_circulation + claim_amount as u128;
@@ -110,6 +224,7 @@ impl Markets {
     }
 
 	pub fn get_fdai_balance(&self, from: String) -> () {
+		env::log(b"aloha top of get_fdai_balance");
 	    // TODO: Return correct balance here
 	    ext_fungible_token::get_balance(from.to_string(), &from.to_string(), 0, SINGLE_CALL_GAS).as_return();
 		//return *self.fdai_balances.get(&from).unwrap();
@@ -165,13 +280,13 @@ impl Markets {
     ) {
 		let from = env::predecessor_account_id();
         ext_fungible_token::get_balance(from.to_string(), &from.to_string(), 0, SINGLE_CALL_GAS).then(
-            ext::check_sufficient_balance(spend, &env::current_account_id(), 0, SINGLE_CALL_GAS)
+            ext_maybe::check_sufficient_balance(spend, &env::current_account_id(), 0, SINGLE_CALL_GAS)
         ).then(
-            ext::purchase_shares(from, market_id, outcome, spend, price, &env::current_account_id(), 0, SINGLE_CALL_GAS)
+            ext_maybe::purchase_shares(from, market_id, outcome, spend, price, &env::current_account_id(), 0, SINGLE_CALL_GAS)
         );
 	}
 
-    #[callback_vec(amount)]
+    // #[callback_vec(amount)]
     pub fn check_sufficient_balance(&mut self, spend: u128, amount: u128) -> Result<bool, String> {
         println!("{:?}", spend);
         if amount >= spend {
@@ -215,13 +330,13 @@ impl Markets {
 	) {
 	    let account_id = env::predecessor_account_id();
         ext_fungible_token::get_balance(account_id.to_string(), &account_id.to_string(), 0, SINGLE_CALL_GAS).then(
-            ext::check_sufficient_balance(stake, &account_id.to_string(), 0, SINGLE_CALL_GAS)
+            ext_maybe::check_sufficient_balance(stake, &account_id.to_string(), 0, SINGLE_CALL_GAS)
         ).then(
-            ext::resolute_approved(market_id, winning_outcome, stake, &account_id.to_string(), 0, SINGLE_CALL_GAS)
+            ext_maybe::resolute_approved(market_id, winning_outcome, stake, &account_id.to_string(), 0, SINGLE_CALL_GAS)
         );
 	}
 
-    #[callback]
+    // #[callback]
     pub fn resolute_approved(
         &mut self,
         market_id: u64,
@@ -233,8 +348,6 @@ impl Markets {
         let change = market.resolute(winning_outcome, stake);
         self.escrow_funds(stake - change);
     }
-
-
 
 	pub fn withdraw_dispute_stake(
 		&mut self,
@@ -286,11 +399,11 @@ impl Markets {
 		let from = env::predecessor_account_id();
 		// TODO: BE ABLE TO PARSE WHETHER THAT TRANSFER WAS SUCCESSFUL OR NOT
 		ext_fungible_token::transfer(env::current_account_id(), amount, &from, 0, SINGLE_CALL_GAS).then(
-            ext::update_fdai_metrics_subtract(amount, &env::current_account_id(), 0, SINGLE_CALL_GAS)
+            ext_maybe::update_fdai_metrics_subtract(amount, &env::current_account_id(), 0, SINGLE_CALL_GAS)
 		);
 	}
 
-	#[callback_vec(amount)]
+	// #[callback_vec(amount)]
     pub fn update_fdai_metrics_subtract(&mut self, amount: u128) {
         // For monitoring supply - just for testnet
         self.fdai_outside_escrow = self.fdai_outside_escrow - amount as u128;
@@ -303,11 +416,11 @@ impl Markets {
 	    account_id: String
     ) {
         ext_fungible_token::transfer_from(env::current_account_id(), account_id.to_string(), amount, &env::current_account_id(), 0, SINGLE_CALL_GAS).then(
-            ext::update_fdai_metrics_add(amount,  &env::current_account_id(), 0, SINGLE_CALL_GAS)
+            ext_maybe::update_fdai_metrics_add(amount,  &env::current_account_id(), 0, SINGLE_CALL_GAS)
         );
     }
 
-	#[callback_vec(amount)]
+	// #[callback_vec(amount)]
     pub fn update_fdai_metrics_add(&mut self, amount: u128) {
         // TODO: Determine if above call was a success
         // For monitoring supply - just for testnet
@@ -471,7 +584,10 @@ impl Markets {
 	pub fn get_fdai_metrics(
 		&self
 	) -> (u128, u128, u128, u64) {
-		return (self.fdai_circulation, self.fdai_in_protocol, self.fdai_outside_escrow, self.user_count);
+		println!("aloha top of get_fdai_metrics (markets)");
+		env::log(b"aloha top of get_fdai_metrics (markets)");
+        (1,9,3,7)
+		// return (self.fdai_circulation, self.fdai_in_protocol, self.fdai_outside_escrow, self.user_count);
 	}
 
 }
@@ -493,13 +609,13 @@ impl Default for Markets {
 	}
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+
 #[cfg(test)]
 mod tests {
     use super::*;
     mod utils;
-    use near_sdk::MockedBlockchain;
-    use near_sdk::{VMContext, testing_env};
+    // use near_sdk::{MockedBlockchain, PromiseResult};
+    use near_sdk::{env, VMContext, testing_env, MockedBlockchain, PromiseResult};
 
 	fn to_dai(amt: u128) -> u128 {
 		let base = 10 as u128;
@@ -567,24 +683,59 @@ mod tests {
             input: vec![],
 			block_index: 0,
 			epoch_height: 0,
-            account_balance: 0,
+            account_balance: 10u128.pow(19),
 			is_view: false,
             storage_usage: 0,
 			block_timestamp: block_timestamp,
 			account_locked_balance: 0,
             attached_deposit: 0,
-            prepaid_gas: 10u64.pow(11),
+            prepaid_gas: 10u64.pow(15), //11
             random_seed: vec![0, 1, 2],
             output_data_receivers: vec![],
 		}
 	}
 
+	pub fn testing_env_with_promise_results(context: VMContext, promise_result: PromiseResult) {
+		println!("aloha outta juice");
+
+		let mut killme1 = env::take_blockchain_interface()
+			.unwrap();
+
+		let killme2 = killme1
+			.as_mut_mocked_blockchain()
+			.unwrap();
+
+		let storage = killme2.take_storage();
+
+		near_sdk::env::set_blockchain_interface(Box::new(MockedBlockchain::new(
+			context,
+			Default::default(),
+			Default::default(),
+			vec![promise_result],
+			storage,
+		)));
+		println!("aloha outta juh-uice");
+	}
 
 
-	mod init_tests;
+	// mod init_tests;
 	//mod market_order_tests;
 	//mod binary_order_matching_tests;
-	mod categorical_market_tests;
+
+	// mod categorical_market_tests;
+	#[test]
+	pub fn mike_test() {
+		let context = get_context("ft.testnet".to_string(), 1906293427246306700);
+		testing_env!(context.clone());
+		// testing_env_with_promise_results(context.clone(), PromiseResult::Successful(vec![]));
+		// let mut contract = Markets::default();
+		let mut contract = Markets::new();
+		// contract.deploy_fungible_token("ft.testnet".to_string(), 10000000000000);
+		// println!("alohaz deployed ft");
+		contract.hardcode_test();
+		println!("alohaz after");
+	}
+
 	//mod market_resolution_tests;
 	//mod claim_earnings_tests;
 	//mod market_depth_tests;

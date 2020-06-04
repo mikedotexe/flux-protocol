@@ -114,7 +114,7 @@ impl ExternalUser {
         let res = runtime.resolve_tx(tx).unwrap();
         runtime.process_all().unwrap();
         let ans = outcome_into_result(res);
-        println!("{:?}", ans);
+        println!("aloha bottom of claim_fdai {:?}", ans);
         return ans;
     }
 
@@ -222,7 +222,8 @@ impl ExternalUser {
         //&HashMap<&u128, Order>::from(serde_json::from_slice::HashMap<u128, Order>(filled_orders.as_slice()).unwrap())
     }
 
-    pub fn get_fdai_metrics(&self, runtime: &RuntimeStandalone) -> u128 {
+    pub fn get_fdai_metrics(&self, runtime: &mut RuntimeStandalone) -> u128 {
+        println!("aloha top of get_fdai_metrics (utils)");
             // TODO: SPECIFY WHAT ACCOUNT TO CALL TO
             let fdai_metrics = runtime
                 .view_method_call(
@@ -235,14 +236,31 @@ impl ExternalUser {
                 .unwrap()
                 .0;
 
-            //TODO: UPDATE THIS CASTING
+            // TODO: UPDATE THIS CASTING
             let data: Vec<serde_json::Value> = serde_json::from_slice(fdai_metrics.as_slice()).unwrap();
-            println!("{:?}", data);
+            println!("aloha old0 {:?}", data);
             // let fdai_metrics_vec: Vec<(u128, u128, u128, u64)> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
             let fdai_metrics_vec: Vec<u8> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
-            println!("{:?}", fdai_metrics_vec);
+            println!("aloha old1 {:?}", fdai_metrics_vec);
+
+        let tx= self
+            .new_tx(runtime, "flux-tests".to_string())
+            .function_call("get_fdai_metrics".to_string(), vec![], 10000000000000000, 0)
+            .sign(&self.signer);
+
+        let res = runtime.resolve_tx(tx).unwrap();
+        runtime.process_all().unwrap();
+        println!("aloha res: {:?}", res);
+        let res2 = outcome_into_result(res);
+        println!("aloha res2: {:?}", res2);
+
+
             return 1;
         }
+
+    pub fn miketest(&self, runtime: &RuntimeStandalone) -> u128 {
+        19
+    }
 
     pub fn create_external(
         &self,
