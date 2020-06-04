@@ -41,7 +41,7 @@ pub trait ExtContract {
     fn check_not_claimed(&mut self);
     fn grant_fdai(&mut self, from: String);
     fn check_sufficient_balance(&mut self, spend: u128);
-    fn update_fdai_metrics(&mut self);
+    fn update_fdai_metrics_claim(&mut self);
     fn update_fdai_metrics_subtract(&mut self, amount: u128);
     fn update_fdai_metrics_add(&mut self, amount: u128);
     fn purchase_shares(&mut self, from: String, market_id: u64, outcome: u64, spend: u128, price: u128);
@@ -70,20 +70,20 @@ impl Markets {
 	// This is a demo method, it mints a currency to interact with markets until we have NDAI
 	pub fn claim_fdai(
 	    &mut self
-    ) {
+    ) -> Promise {
 		let from = env::predecessor_account_id();
 		ext_fungible_token::get_balance(from.to_string(), &from.to_string(), 0, SINGLE_CALL_GAS).then(
 		    ext::check_not_claimed(&env::current_account_id(), 0, SINGLE_CALL_GAS)
         ).then(
 		    ext::grant_fdai(from.to_string(), &env::current_account_id(), 0, SINGLE_CALL_GAS)
 		).then(
-		    ext::update_fdai_metrics(&env::current_account_id(), 0, SINGLE_CALL_GAS)
-		);
+		    ext::update_fdai_metrics_claim(&env::current_account_id(), 0, SINGLE_CALL_GAS)
+		)
 	}
 
-	#[callback_vec(amount)]
-    pub fn check_not_claimed(&mut self, amount: u128) -> Result<bool, String> {
-        println!("{:?}", amount);
+    pub fn check_not_claimed(&mut self, #[callback] amount: u128) -> Result<bool, String> {
+        println!("debug check_not_claimed {:?}", amount);
+        env::log(format!("debug check_not_claimed {:?}", amount).as_bytes());
         if amount != 0 {
             return Ok(amount != 0);
         } else {
@@ -91,17 +91,17 @@ impl Markets {
         }
     }
 
-    #[callback_vec(check_result)]
-    pub fn grant_fdai(&mut self, from: String, check_result: Result<bool, String>) {
+    pub fn grant_fdai(&mut self, from: String, #[callback] check_result: Result<bool, String>) {
         println!("{:?}", check_result);
+		env::log(format!("debug grant_fdai {:#?}", check_result).as_bytes());
         if let Ok(true) = check_result {
             let claim_amount = 100 * self.dai_token();
             ext_fungible_token::transfer_from(env::current_account_id(), from, claim_amount, &env::current_account_id(), 0, SINGLE_CALL_GAS);
         }
     }
 
-    #[callback]
     pub fn update_fdai_metrics_claim(&mut self) {
+		env::log(format!("debug update_fdai_metrics_claim").as_bytes());
         // TODO: Determine if above call was a success
         let claim_amount = 100 * self.dai_token();
         self.fdai_circulation = self.fdai_circulation + claim_amount as u128;
