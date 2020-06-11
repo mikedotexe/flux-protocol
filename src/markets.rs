@@ -41,12 +41,12 @@ pub trait ExtFungibleToken {
 pub trait ExtContract {
     fn check_not_claimed(&mut self) -> bool;
     fn grant_fdai(&mut self, from: String);
-    fn check_sufficient_balance(&mut self, spend: u128);
+    fn check_sufficient_balance(&mut self, spend: U128);
     fn update_fdai_metrics_claim(&mut self);
     fn update_fdai_metrics_subtract(&mut self, amount: u128);
     fn update_fdai_metrics_add(&mut self, amount: u128);
-    fn purchase_shares(&mut self, from: String, market_id: u64, outcome: u64, spend: u128, price: u128);
-    fn resolute_approved(&mut self, market_id: u64, winning_outcome: Option<u64>, stake: u128);
+    fn purchase_shares(&mut self, from: String, market_id: u64, outcome: u64, spend: U128, price: U128);
+    fn resolute_approved(&mut self, market_id: u64, winning_outcome: Option<u64>, stake: U128);
 }
 
 #[near_bindgen]
@@ -147,6 +147,7 @@ impl Markets {
 		let market_id = new_market.id;
 		self.active_markets.insert(self.nonce, new_market);
 		self.nonce = self.nonce + 1;
+		env::log(format!("debug create_market").as_bytes());
 		return market_id;
 	}
 
@@ -163,33 +164,39 @@ impl Markets {
         &mut self,
         market_id: u64,
         outcome: u64,
-        spend: u128,
-        price: u128
+        spend: U128,
+        price: U128
     ) {
 		let from = env::predecessor_account_id();
-        ext_fungible_token::get_balance(from.to_string(), &from.to_string(), 0, SINGLE_CALL_GAS).then(
-            ext::check_sufficient_balance(spend, &env::current_account_id(), 0, SINGLE_CALL_GAS)
-        ).then(
-            ext::purchase_shares(from, market_id, outcome, spend, price, &env::current_account_id(), 0, SINGLE_CALL_GAS)
+        ext_fungible_token::get_balance(from.to_string(), &from.to_string(), 0, SINGLE_CALL_GAS * 3)
+        .then(
+            ext::check_sufficient_balance(spend, &env::current_account_id(), 0, SINGLE_CALL_GAS * 3)
+        )
+        .then(
+            ext::purchase_shares(from.to_string(), market_id, outcome, spend, price, &env::current_account_id(), 0, SINGLE_CALL_GAS * 3)
         );
 	}
 
-    #[callback_vec(amount)]
-    pub fn check_sufficient_balance(&mut self, spend: u128, amount: u128) -> Result<bool, String> {
-        println!("{:?}", spend);
-        if amount >= spend {
-            return Ok(amount >= spend);
+    pub fn check_sufficient_balance(&mut self, spend: U128, #[callback] amount: U128) -> Result<bool, String> {
+        env::log(format!("debug place_order").as_bytes());
+        let u128amount = u128::from(amount);
+        let u128spend = u128::from(spend);
+        if u128amount >= u128spend {
+            return Ok(u128amount >= u128spend);
         } else {
             return Err("user does not have sufficient balance".to_string());
         }
     }
 
-    #[callback]
-    pub fn purchase_shares(&mut self, from: String, market_id: u64, outcome: u64, spend: u128, price: u128) {
-        let amount_of_shares = spend / price;
-        let rounded_spend = amount_of_shares * price;
+    pub fn purchase_shares(&mut self, from: String, market_id: u64, outcome: u64, spend: U128, price: U128) {
+        env::log(format!("debug place_order").as_bytes());
+        let u128spend = u128::from(spend);
+        let u128price = u128::from(price);
+
+        let amount_of_shares = u128spend / u128price;
+        let rounded_spend = amount_of_shares * u128price;
         let market = self.active_markets.get_mut(&market_id).unwrap();
-        market.create_order(from.to_string(), outcome, amount_of_shares, rounded_spend, price);
+        market.create_order(from.to_string(), outcome, amount_of_shares, rounded_spend, u128price);
         self.escrow_funds(rounded_spend);
     }
 
@@ -214,7 +221,7 @@ impl Markets {
 		&mut self,
 		market_id: u64,
 		winning_outcome: Option<u64>,
-		stake: u128
+		stake: U128
 	) {
 	    let account_id = env::predecessor_account_id();
         ext_fungible_token::get_balance(account_id.to_string(), &account_id.to_string(), 0, SINGLE_CALL_GAS).then(
@@ -229,12 +236,13 @@ impl Markets {
         &mut self,
         market_id: u64,
         winning_outcome: Option<u64>,
-        stake: u128
+        stake: U128
     ) {
         let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
         assert_eq!(market.resoluted, false);
-        let change = market.resolute(winning_outcome, stake);
-        self.escrow_funds(stake - change);
+        let u128stake = u128::from(stake);
+        let change = market.resolute(winning_outcome, u128stake);
+        self.escrow_funds(u128stake - change);
     }
 
 

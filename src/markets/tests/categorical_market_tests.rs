@@ -4,9 +4,7 @@ use near_sdk::json_types::U128;
 
 #[test]
 fn test_categorical_market_automated_matcher() {
-	//testing_env!(get_context(carol(), current_block_timestamp()));
 
-    // TODO: Initialize block timestamp
     let (ref mut runtime, ref root) = init_markets_contract();
 
     // Call claim_fdai, create market, place orders
@@ -25,23 +23,23 @@ fn test_categorical_market_automated_matcher() {
     accounts[0].token_deploy_call_new(runtime, accounts[0].get_account_id().to_string(),  U128(10000000000000000)).unwrap();
 
     // Call claim_fdai, create market
-    println!("debug accounts[0] {:#?}", accounts[0].claim_fdai(runtime).unwrap());
+    println!("debug accounts[0] claim_fdai {:#?}", accounts[0].claim_fdai(runtime).unwrap());
 
     accounts[0].get_fdai_metrics(runtime);
 
-    accounts[0].create_market(runtime, "Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(),  market_end_timestamp_ms(), 0, 0, "test".to_string()).unwrap();
+    println!("debug accounts[0] create_market {:#?}", accounts[0].create_market(runtime, "Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(),  market_end_timestamp_ms(), 0, 0, "test".to_string()).unwrap());
 
     // best prices - market price = 10
-    accounts[0].place_order(runtime, 0, 0, 3000, 30);
-    accounts[0].place_order(runtime, 0, 1, 6000, 60);
+    println!("debug accounts[0] place_order {:#?}", accounts[0].place_order(runtime, 0, 0, U128(3000), U128(30)).unwrap());
+    accounts[0].place_order(runtime, 0, 1, U128(6000), U128(60));
 
     // worse prices - market price = 25
-    accounts[0].place_order(runtime, 0, 0, 2500, 25);
-    accounts[0].place_order(runtime, 0, 1, 5000, 50);
+    accounts[0].place_order(runtime, 0, 0, U128(2500), U128(25));
+    accounts[0].place_order(runtime, 0, 1, U128(5000), U128(50));
 
     // alice fills all orders
     println!("debug accounts[1] {:#?}", accounts[1].claim_fdai(runtime).unwrap());
-    accounts[1].place_order(runtime, 0, 2, 3500, 25);
+    accounts[1].place_order(runtime, 0, 2, U128(3500), U128(25));
 
     let open_0_orders = accounts[1].get_open_orders(runtime, 0, 0);
     let open_1_orders = accounts[1].get_open_orders(runtime, 0, 1);
@@ -69,7 +67,7 @@ fn test_categorical_market_automated_matcher() {
 	assert_eq!(open_0_orders.len(), 0);
 	assert_eq!(open_1_orders.len(), 0);
 	assert_eq!(open_2_orders.len(), 0);
-	assert_eq!(filled_0_orders.len(), 0);
-	assert_eq!(filled_1_orders.len(), 0);
-	assert_eq!(filled_2_orders.len(), 0);
+	assert_eq!(filled_0_orders.len(), 2);
+	assert_eq!(filled_1_orders.len(), 2);
+	assert_eq!(filled_2_orders.len(), 1);
 }

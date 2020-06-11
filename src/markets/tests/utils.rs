@@ -75,8 +75,6 @@ impl ExternalUser {
 
         let tx = self
             .new_tx(runtime, account)
-            // .create_account()
-            // .transfer(99994508400000000000000000)
             .deploy_contract(FUNGIBLE_TOKEN_BYTES.to_vec())
             .function_call("new".into(), args, 10000000000000000, 0)
             .sign(&self.signer);
@@ -114,7 +112,6 @@ impl ExternalUser {
         let res = runtime.resolve_tx(tx).unwrap();
         runtime.process_all().unwrap();
         let ans = outcome_into_result(res);
-        println!("{:?}", ans);
         return ans;
     }
 
@@ -153,7 +150,6 @@ impl ExternalUser {
         let res = runtime.resolve_tx(tx).unwrap();
         runtime.process_all().unwrap();
         let ans = outcome_into_result(res);
-        //println!("{:?}", ans);
         return ans;
     }
 
@@ -162,8 +158,8 @@ impl ExternalUser {
         runtime: &mut RuntimeStandalone,
         market_id: u64,
         outcome: u64,
-        spend: u64,
-        price: u64,
+        spend: U128,
+        price: U128,
     ) -> TxResult {
         let args = json!({
             "market_id": market_id,
@@ -179,9 +175,9 @@ impl ExternalUser {
             .function_call("place_order".into(), args, 10000000000000000, 0)
             .sign(&self.signer);
         let res = runtime.resolve_tx(tx).unwrap();
-        //println!("{:?}", res);
         runtime.process_all().unwrap();
-        outcome_into_result(res)
+        let ans = outcome_into_result(res);
+        return ans;
     }
 
     pub fn get_open_orders(&self, runtime: &RuntimeStandalone, market_id: u64, outcome: u64) -> HashMap<u128, Order> {
@@ -200,10 +196,12 @@ impl ExternalUser {
         //TODO: UPDATE THIS CASTING
         let data: HashMap<&str, serde_json::Value> = serde_json::from_slice(open_orders.as_slice()).unwrap();
         let open_orders_map: HashMap<u128, Order> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
+        println!("{:?}", open_orders_map);
         return open_orders_map;
     }
 
-    pub fn get_filled_orders(&self, runtime: &RuntimeStandalone, market_id: u64, outcome: u64) -> HashMap<u128, Order> {
+    pub fn get_filled_orders(&self, runtime: &RuntimeStandalone, market_id: u64, outcome: u64) -> HashMap<u128, Order>{
+        // SHOULD RETURN HashMap<u128, Order>
         let filled_orders = runtime
             .view_method_call(
                 &("flux-tests".to_string()),
@@ -214,16 +212,13 @@ impl ExternalUser {
             )
             .unwrap()
             .0;
-        //TODO: UPDATE THIS CASTING
         let data: HashMap<&str, serde_json::Value> = serde_json::from_slice(filled_orders.as_slice()).unwrap();
-        // do custom stuff
         let filled_orders_map: HashMap<u128, Order> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
+        println!("{:?}", filled_orders_map);
         return filled_orders_map;
-        //&HashMap<&u128, Order>::from(serde_json::from_slice::HashMap<u128, Order>(filled_orders.as_slice()).unwrap())
     }
 
-    pub fn get_fdai_metrics(&self, runtime: &RuntimeStandalone) -> u128 {
-            // TODO: SPECIFY WHAT ACCOUNT TO CALL TO
+    pub fn get_fdai_metrics(&self, runtime: &RuntimeStandalone) -> Vec<u128> {
             let fdai_metrics = runtime
                 .view_method_call(
                     &("flux-tests".to_string()),
@@ -237,11 +232,9 @@ impl ExternalUser {
 
             //TODO: UPDATE THIS CASTING
             let data: Vec<serde_json::Value> = serde_json::from_slice(fdai_metrics.as_slice()).unwrap();
-            println!("{:?}", data);
-            // let fdai_metrics_vec: Vec<(u128, u128, u128, u64)> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
             let fdai_metrics_vec: Vec<u128> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
             println!("{:?}", fdai_metrics_vec);
-            return 1;
+            return fdai_metrics_vec;
         }
 
     pub fn create_external(
