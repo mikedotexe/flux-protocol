@@ -7,7 +7,6 @@ fn test_categorical_market_automated_matcher() {
 
     let (ref mut runtime, ref root) = init_markets_contract();
 
-    // Call claim_fdai, create market, place orders
     let mut accounts: Vec<ExternalUser> = vec![];
     for acc_no in 0..2 {
         let acc = if let Ok(acc) =
@@ -23,14 +22,9 @@ fn test_categorical_market_automated_matcher() {
     accounts[0].token_deploy_call_new(runtime, accounts[0].get_account_id().to_string(),  U128(10000000000000000)).unwrap();
 
     // Call claim_fdai, create market
-    println!("debug accounts[0] claim_fdai {:#?}", accounts[0].claim_fdai(runtime).unwrap());
-
     accounts[0].get_fdai_metrics(runtime);
 
-    println!("debug accounts[0] create_market {:#?}", accounts[0].create_market(runtime, "Hi!".to_string(), empty_string(), 3, outcome_tags(3), categories(),  market_end_timestamp_ms(), 0, 0, "test".to_string()).unwrap());
-
     // best prices - market price = 10
-    println!("debug accounts[0] place_order {:#?}", accounts[0].place_order(runtime, 0, 0, U128(3000), U128(30)).unwrap());
     accounts[0].place_order(runtime, 0, 1, U128(6000), U128(60));
 
     // worse prices - market price = 25
@@ -38,7 +32,6 @@ fn test_categorical_market_automated_matcher() {
     accounts[0].place_order(runtime, 0, 1, U128(5000), U128(50));
 
     // alice fills all orders
-    println!("debug accounts[1] {:#?}", accounts[1].claim_fdai(runtime).unwrap());
     accounts[1].place_order(runtime, 0, 2, U128(3500), U128(25));
 
     let open_0_orders = accounts[1].get_open_orders(runtime, 0, 0);

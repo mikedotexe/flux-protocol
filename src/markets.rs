@@ -224,28 +224,29 @@ impl Markets {
 		stake: U128
 	) {
 	    let account_id = env::predecessor_account_id();
-        ext_fungible_token::get_balance(account_id.to_string(), &account_id.to_string(), 0, SINGLE_CALL_GAS).then(
+        ext_fungible_token::get_balance(account_id.to_string(), &account_id.to_string(), 0, SINGLE_CALL_GAS)
+        .then(
             ext::check_sufficient_balance(stake, &account_id.to_string(), 0, SINGLE_CALL_GAS)
         ).then(
             ext::resolute_approved(market_id, winning_outcome, stake, &account_id.to_string(), 0, SINGLE_CALL_GAS)
         );
 	}
 
-    #[callback]
     pub fn resolute_approved(
         &mut self,
         market_id: u64,
         winning_outcome: Option<u64>,
-        stake: U128
+        stake: U128,
+        #[callback] approved: Result<bool, String>,
     ) {
-        let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
-        assert_eq!(market.resoluted, false);
-        let u128stake = u128::from(stake);
-        let change = market.resolute(winning_outcome, u128stake);
-        self.escrow_funds(u128stake - change);
+        if approved.is_ok() {
+            let market = self.active_markets.get_mut(&market_id).expect("market doesn't exist");
+            assert_eq!(market.resoluted, false);
+            let u128stake = u128::from(stake);
+            let change = market.resolute(winning_outcome, u128stake);
+            self.escrow_funds(u128stake - change);
+        }
     }
-
-
 
 	pub fn withdraw_dispute_stake(
 		&mut self,
@@ -301,8 +302,7 @@ impl Markets {
 		);
 	}
 
-	#[callback_vec(amount)]
-    pub fn update_fdai_metrics_subtract(&mut self, amount: u128) {
+    pub fn update_fdai_metrics_subtract(&mut self, #[callback] amount: u128) {
         // For monitoring supply - just for testnet
         self.fdai_outside_escrow = self.fdai_outside_escrow - amount as u128;
         self.fdai_in_protocol= self.fdai_outside_escrow + amount as u128;
@@ -314,14 +314,11 @@ impl Markets {
 	    account_id: String
     ) {
         ext_fungible_token::transfer_from(env::current_account_id(), account_id.to_string(), amount, &env::current_account_id(), 0, SINGLE_CALL_GAS).then(
-            ext::update_fdai_metrics_add(amount,  &env::current_account_id(), 0, SINGLE_CALL_GAS)
+            ext::update_fdai_metrics_add(amount, &env::current_account_id(), 0, SINGLE_CALL_GAS)
         );
     }
 
-	#[callback_vec(amount)]
-    pub fn update_fdai_metrics_add(&mut self, amount: u128) {
-        // TODO: Determine if above call was a success
-        // For monitoring supply - just for testnet
+    pub fn update_fdai_metrics_add(&mut self, #[callback] amount: u128) {
         self.fdai_outside_escrow = self.fdai_outside_escrow + amount as u128;
         self.fdai_in_protocol= self.fdai_outside_escrow - amount as u128;
     }
@@ -385,17 +382,30 @@ impl Markets {
 		market_id: u64,
 		account_id: String
 	) {
-		let market = self.active_markets.get_mut(&market_id).unwrap();
-		assert!(env::block_timestamp() / 1000000 >= market.end_time, "market hasn't ended yet");
-		assert_eq!(market.resoluted, true);
-		assert_eq!(market.finalized, true);
-
-		let claimable = market.get_claimable_for(account_id.to_string());
-		market.reset_balances_for(account_id.to_string());
-		market.delete_resolution_for(account_id.to_string());
-
-		self.payout(claimable, account_id);
+		let from = env::predecessor_account_id();
+        let claimable = self.get_claimable(market_id, account_id.to_string());
+        ext_fungible_token::transfer_from(env::current_account_id(), account_id.to_string(), claimable, &env::current_account_id(), 0, SINGLE_CALL_GAS * 3);
+        // TODO: Figure out how to store amount such that it is usable to update fdai_metrics
+        //.then(
+            //ext::update_fdai_metrics_add(amount, &env::current_account_id(), 0, SINGLE_CALL_GAS * 3)
+            //ext::purchase_shares(from.to_string(), market_id, outcome, spend, price, &env::current_account_id(), 0, SINGLE_CALL_GAS * 3)
+        //);
 	}
+
+	fn get_claimable_for(&mut self, market_id: u64, account_id: String) -> u128 {
+            env::log(format!("debug get_claimable_for").as_bytes());
+            let market = self.active_markets.get_mut(&market_id).unwrap();
+            //assert!(env::block_timestamp() / 1000000 >= market.end_time, "market hasn't ended yet");
+            assert_eq!(market.resoluted, true);
+            assert_eq!(market.finalized, true);
+
+            let claimable = market.get_claimable_for(account_id.to_string());
+            market.reset_balances_for(account_id.to_string());
+            market.delete_resolution_for(account_id.to_string());
+            return claimable;
+    }
+
+
 
 	pub fn get_all_markets(
 		&self
@@ -512,9 +522,11 @@ mod tests {
     use near_sdk::MockedBlockchain;
     use near_sdk::{VMContext, testing_env};
 
-	fn to_dai(amt: u128) -> u128 {
+	fn to_dai(amt: u128) -> U128 {
 		let base = 10 as u128;
-		return amt * base.pow(17);
+		let amount_u128 = amt * base.pow(17);
+		let amount = U128::from(amount_u128);
+		return amount;
 	}
 
 	fn judge() -> String {
@@ -597,6 +609,6 @@ mod tests {
 	//mod binary_order_matching_tests;
 	mod categorical_market_tests;
 	//mod market_resolution_tests;
-	//mod claim_earnings_tests;
+	mod claim_earnings_tests;
 	//mod market_depth_tests;
 }

@@ -180,6 +180,77 @@ impl ExternalUser {
         return ans;
     }
 
+    pub fn resolute_market(
+        &self,
+        runtime: &mut RuntimeStandalone,
+        market_id: u64,
+        winning_outcome: Option<u64>,
+        stake: U128
+    ) -> TxResult {
+        let args = json!({
+            "market_id": market_id,
+            "winning_outcome": winning_outcome,
+            "stake": stake
+        })
+        .to_string()
+        .as_bytes()
+        .to_vec();
+        let tx = self
+            .new_tx(runtime, "flux-tests".to_string())
+            .function_call("resolute_market".into(), args, 10000000000000000, 0)
+            .sign(&self.signer);
+        let res = runtime.resolve_tx(tx).unwrap();
+        runtime.process_all().unwrap();
+        let ans = outcome_into_result(res);
+        return ans;
+    }
+
+    pub fn finalize_market (
+        &self,
+        runtime: &mut RuntimeStandalone,
+        market_id: u64,
+        winning_outcome: Option<u64>
+    ) -> TxResult {
+        let args = json!({
+            "market_id": market_id,
+            "winning_outcome": winning_outcome,
+        })
+        .to_string()
+        .as_bytes()
+        .to_vec();
+        let tx = self
+            .new_tx(runtime, "flux-tests".to_string())
+            .function_call("finalize_market".into(), args, 10000000000000000, 0)
+            .sign(&self.signer);
+        let res = runtime.resolve_tx(tx).unwrap();
+        runtime.process_all().unwrap();
+        let ans = outcome_into_result(res);
+        return ans;
+    }
+
+    pub fn claim_earnings (
+        &mut self,
+        runtime: &mut RuntimeStandalone,
+        market_id: u64,
+        account_id: String
+    ) -> TxResult {
+        let args = json!({
+            "market_id": market_id,
+            "account_id": account_id,
+        })
+        .to_string()
+        .as_bytes()
+        .to_vec();
+        let tx = self
+            .new_tx(runtime, "flux-tests".to_string())
+            .function_call("claim_earnings".into(), args, 10000000000000000, 0)
+            .sign(&self.signer);
+        let res = runtime.resolve_tx(tx).unwrap();
+        runtime.process_all().unwrap();
+        let ans = outcome_into_result(res);
+        return ans;
+    }
+
     pub fn get_open_orders(&self, runtime: &RuntimeStandalone, market_id: u64, outcome: u64) -> HashMap<u128, Order> {
         // TODO: SPECIFY WHAT ACCOUNT TO CALL TO
         let open_orders = runtime
@@ -206,7 +277,10 @@ impl ExternalUser {
             .view_method_call(
                 &("flux-tests".to_string()),
                 "get_filled_orders",
-                json!({"market_id": market_id, "outcome": outcome})
+                json!({
+                    "market_id": market_id,
+                    "outcome": outcome
+                    })
                     .to_string()
                     .as_bytes(),
             )
@@ -219,23 +293,65 @@ impl ExternalUser {
     }
 
     pub fn get_fdai_metrics(&self, runtime: &RuntimeStandalone) -> Vec<u128> {
-            let fdai_metrics = runtime
-                .view_method_call(
-                    &("flux-tests".to_string()),
-                    "get_fdai_metrics",
-                    json!({})
-                        .to_string()
-                        .as_bytes(),
-                )
-                .unwrap()
-                .0;
+        let fdai_metrics = runtime
+            .view_method_call(
+                &("flux-tests".to_string()),
+                "get_fdai_metrics",
+                json!({})
+                    .to_string()
+                    .as_bytes(),
+            )
+            .unwrap()
+            .0;
 
-            //TODO: UPDATE THIS CASTING
-            let data: Vec<serde_json::Value> = serde_json::from_slice(fdai_metrics.as_slice()).unwrap();
-            let fdai_metrics_vec: Vec<u128> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
-            println!("{:?}", fdai_metrics_vec);
-            return fdai_metrics_vec;
-        }
+        //TODO: UPDATE THIS CASTING
+        let data: Vec<serde_json::Value> = serde_json::from_slice(fdai_metrics.as_slice()).unwrap();
+        let fdai_metrics_vec: Vec<u128> = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
+        println!("{:?}", fdai_metrics_vec);
+        return fdai_metrics_vec;
+    }
+
+    pub fn get_fdai_balance(&self, runtime: &RuntimeStandalone, account_id: String) -> u128 {
+        let fdai_balance_json = runtime
+            .view_method_call(
+                &("flux-tests".to_string()),
+                "get_fdai_balance",
+                json!({
+                    "account_id": account_id
+                })
+                    .to_string()
+                    .as_bytes(),
+            )
+            .unwrap()
+            .0;
+
+        let data: serde_json::Value = serde_json::from_slice(fdai_balance_json.as_slice()).unwrap();
+        let fdai_balance: u128 = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
+        println!("{:?}", fdai_balance);
+        return fdai_balance;
+    }
+
+    pub fn get_claimable(&self, runtime: &RuntimeStandalone, market_id: u64, account_id: String) -> u128 {
+        let claimable_json = runtime
+            .view_method_call(
+                &("flux-tests".to_string()),
+                "get_claimable",
+                json!({
+                    "market_id": market_id,
+                    "account_id": account_id
+                    })
+                    .to_string()
+                    .as_bytes(),
+            )
+            .unwrap()
+            .0;
+
+        //TODO: UPDATE THIS CASTING
+        let data: serde_json::Value = serde_json::from_slice(claimable_json.as_slice()).unwrap();
+        let claimable: u128 = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
+        println!("{:?}", claimable);
+        return claimable;
+    }
 
     pub fn create_external(
         &self,
