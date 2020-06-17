@@ -251,6 +251,31 @@ impl ExternalUser {
         return ans;
     }
 
+    pub fn cancel_order (
+            &mut self,
+            runtime: &mut RuntimeStandalone,
+            market_id: u64,
+            outcome: u64,
+            order_id: u128
+        ) -> TxResult {
+            let args = json!({
+                "market_id": market_id,
+                "outcome": outcome,
+                "order_id": order_id
+            })
+            .to_string()
+            .as_bytes()
+            .to_vec();
+            let tx = self
+                .new_tx(runtime, "flux-tests".to_string())
+                .function_call("cancel_order".into(), args, 10000000000000000, 0)
+                .sign(&self.signer);
+            let res = runtime.resolve_tx(tx).unwrap();
+            runtime.process_all().unwrap();
+            let ans = outcome_into_result(res);
+            return ans;
+        }
+
     pub fn get_open_orders(&self, runtime: &RuntimeStandalone, market_id: u64, outcome: u64) -> HashMap<u128, Order> {
         // TODO: SPECIFY WHAT ACCOUNT TO CALL TO
         let open_orders = runtime
@@ -327,6 +352,7 @@ impl ExternalUser {
 
         let data: serde_json::Value = serde_json::from_slice(fdai_balance_json.as_slice()).unwrap();
         let fdai_balance: u128 = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
+        println!("FDAI BALANCE");
         println!("{:?}", fdai_balance);
         return fdai_balance;
     }
@@ -351,6 +377,61 @@ impl ExternalUser {
         let claimable: u128 = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
         println!("{:?}", claimable);
         return claimable;
+    }
+
+    pub fn get_market_price(&self, runtime: &RuntimeStandalone, market_id: u64, outcome: u64) -> u128 {
+            let market_price_json = runtime
+                .view_method_call(
+                    &("flux-tests".to_string()),
+                    "get_market_price",
+                    json!({"market_id": market_id, "outcome": outcome})
+                        .to_string()
+                        .as_bytes(),
+                )
+                .unwrap()
+                .0;
+
+            //TODO: UPDATE THIS CASTING
+            let data: serde_json::Value = serde_json::from_slice(market_price_json.as_slice()).unwrap();
+            let market_price: u128 = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
+            println!("{:?}", market_price);
+            return market_price;
+        }
+
+    pub fn get_liquidity(&self, runtime: &RuntimeStandalone, market_id: u64, outcome: u64, price:u128) -> u128 {
+        let market_price_json = runtime
+            .view_method_call(
+                &("flux-tests".to_string()),
+                "get_liquidity",
+                json!({"market_id": market_id, "outcome": outcome, "price": price})
+                    .to_string()
+                    .as_bytes(),
+            )
+            .unwrap()
+            .0;
+
+        let data: serde_json::Value = serde_json::from_slice(market_price_json.as_slice()).unwrap();
+        let market_price: u128 = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
+        println!("{:?}", market_price);
+        return market_price;
+    }
+
+    pub fn get_depth(&self, runtime: &RuntimeStandalone, market_id: u64, outcome: u64, spend:u128, price:u128) -> u128 {
+        let market_price_json = runtime
+            .view_method_call(
+                &("flux-tests".to_string()),
+                "get_liquidity",
+                json!({"market_id": market_id, "outcome": outcome, "spend": spend, "price": price})
+                    .to_string()
+                    .as_bytes(),
+            )
+            .unwrap()
+            .0;
+
+        let data: serde_json::Value = serde_json::from_slice(market_price_json.as_slice()).unwrap();
+        let market_price: u128 = serde_json::from_value(serde_json::to_value(data).unwrap()).unwrap();
+        println!("{:?}", market_price);
+        return market_price;
     }
 
     pub fn create_external(

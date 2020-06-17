@@ -19,6 +19,8 @@ fn test_payout() {
         };
         accounts.push(acc);
     }
+    let account_0_id = accounts[0].get_account_id();
+    let account_1_id = accounts[1].get_account_id();
 
     accounts[0].token_deploy_call_new(runtime, accounts[0].get_account_id().to_string(),  U128(10000000000000000));
 
@@ -35,24 +37,32 @@ fn test_payout() {
 
 	accounts[0].resolute_market(runtime, 0, None, to_dai(5));
 
-	let initially_claimable_carol = accounts[0].get_claimable(runtime, 0, carol());
-	let initially_claimable_alice = accounts[0].get_claimable(runtime, 0, alice());
+	let initially_claimable_carol = accounts[0].get_claimable(runtime, 0, account_0_id.to_string());
+	println!("Initially claimable CAROL");
+	println!("{:?}", initially_claimable_carol);
+	let initially_claimable_alice = accounts[0].get_claimable(runtime, 0, account_1_id.to_string());
+	println!("Initially claimable ALICE");
+	println!("{:?}", initially_claimable_carol);
 
-	let initial_balance_carol = accounts[0].get_fdai_balance(runtime, carol());
-	let initial_balance_alice = accounts[0].get_fdai_balance(runtime, alice());
+	let initial_balance_carol = accounts[0].get_fdai_balance(runtime, account_0_id.to_string());
+	let initial_balance_alice = accounts[0].get_fdai_balance(runtime, account_1_id.to_string());
 	// TODO: Find way to accelerate block number;
 	//testing_env!(get_context(carol(), market_end_timestamp_ns() + 1800000000000));
 
     accounts[0].finalize_market(runtime, 0, Some(0));
-	accounts[0].claim_earnings(runtime, 0, carol());
-	accounts[0].claim_earnings(runtime, 0, alice());
+	accounts[0].claim_earnings(runtime, 0, account_0_id.to_string());
+	accounts[0].claim_earnings(runtime, 0, account_1_id.to_string());
 
     // TODO: If failing, make sure that the correct account is calling the correct function
-	let claimable_after_claim_carol = accounts[0].get_claimable(runtime, 0, carol());
-	let claimable_after_claim_alice = accounts[0].get_claimable(runtime, 0, alice());
+	let claimable_after_claim_carol = accounts[0].get_claimable(runtime, 0, account_0_id.to_string());
+	println!("Claimable after CAROL");
+    println!("{:?}", claimable_after_claim_carol);
+	let claimable_after_claim_alice = accounts[0].get_claimable(runtime, 0, account_1_id.to_string());
+	println!("Claimable after ALICE");
+    println!("{:?}", claimable_after_claim_alice);
 
-	let updated_balance_carol = accounts[0].get_fdai_balance(runtime, carol());
-	let updated_balance_alice = accounts[0].get_fdai_balance(runtime, alice());
+	let updated_balance_carol = accounts[0].get_fdai_balance(runtime, account_0_id.to_string());
+	let updated_balance_alice = accounts[0].get_fdai_balance(runtime, account_1_id.to_string());
 
 	assert_eq!(updated_balance_carol, initially_claimable_carol + initial_balance_carol);
 	assert_eq!(updated_balance_alice, initially_claimable_alice + initial_balance_alice);

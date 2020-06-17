@@ -112,9 +112,9 @@ impl Markets {
         self.user_count = self.user_count + 1;
     }
 
-	pub fn get_fdai_balance(&self, from: String) -> () {
-	    // TODO: Return correct balance here
-	    ext_fungible_token::get_balance(from.to_string(), &from.to_string(), 0, SINGLE_CALL_GAS).as_return();
+	pub fn get_fdai_balance(&self, account_id: String) -> () {
+	    // TODO: Return correct balance here -- this is the blocker right now -- returning () but should return u128
+	    ext_fungible_token::get_balance(account_id.to_string(), &account_id.to_string(), 0, SINGLE_CALL_GAS).as_return();
 		//return *self.fdai_balances.get(&from).unwrap();
 	}
 
@@ -214,8 +214,11 @@ impl Markets {
 		let order = orderbook.open_orders.get(&order_id).unwrap();
 		assert!(account_id == order.creator);
 		let to_return = orderbook.remove_order(order_id);
-		self.payout(to_return, account_id);
+		ext_fungible_token::transfer_from(env::current_account_id(), account_id.to_string(), to_return, &env::current_account_id(), 0, SINGLE_CALL_GAS * 3).then(
+            ext::update_fdai_metrics_subtract(to_return, &env::current_account_id(), 0, SINGLE_CALL_GAS * 3)
+        );
     }
+
 
 	pub fn resolute_market(
 		&mut self,
@@ -605,10 +608,10 @@ mod tests {
 
 
 	mod init_tests;
-	//mod market_order_tests;
-	//mod binary_order_matching_tests;
+	mod market_order_tests;
+	mod binary_order_matching_tests;
 	mod categorical_market_tests;
-	//mod market_resolution_tests;
+	mod market_resolution_tests;
 	mod claim_earnings_tests;
-	//mod market_depth_tests;
+	mod market_depth_tests;
 }
